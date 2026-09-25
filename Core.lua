@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.2.0"
+BC.VERSION = "1.2.1"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END

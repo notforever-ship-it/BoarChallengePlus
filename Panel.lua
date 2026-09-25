@@ -1,35 +1,57 @@
 -- Boar Challenge +: the panel on screen, and the window for changing the numbers.
+--
+-- The panel leads with the number that matters, boars left to the next level, then an XP bar, then
+-- the rest as label / value / note rows.
 
 local BC = BoarChallengePlus
 local GOLD, GREY, WHITE, RED, GREEN, END = BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END
 
-local WIDTH, HEIGHT = 250, 152
-local panel, text
+local WIDTH = 262
+local ROW_H, ROWS_Y, VALUE_X, NOTE_X = 16, -96, 152, 160
+local ROWS = {
+  { key = "kills", label = "Boars killed" },
+  { key = "xph", label = "XP per hour" },
+  { key = "bph", label = "Boars per hour" },
+  { key = "xpb", label = "XP per boar" },
+  { key = "played", label = "Played" },
+  { key = "deaths", label = "Deaths" },
+}
+local HEIGHT = -ROWS_Y + table.getn(ROWS) * ROW_H + 10
+
+local panel, nameText, bigText, paceText, bar, barText
+local rows = {}
 local elapsed = 0
 
-local function Line(label, value)
-  return GREY .. label .. END .. " " .. WHITE .. value .. END
+local function Row(row, value, note)
+  row.value:SetText(value)
+  row.note:SetText(note and (GREY .. note .. END) or "")
 end
 
 local function Draw()
   if not panel or not panel:IsShown() or not BC.char then return end
   local st = BC.Stats()
-  local lines = {}
-  table.insert(lines, Line("Boars", BC.Num(st.kills)) .. GREY .. "  (" .. BC.Num(st.sessionKills) .. " this session)" .. END)
-  table.insert(lines, Line("Level " .. st.level, st.pct .. "%") .. GREY .. "  " .. BC.Num(st.xp) .. " / " .. BC.Num(st.xpMax) .. " XP" .. END)
-  local recentXP = (st.xpHourRecent > 0) and (GREY .. "  (last 30 min " .. BC.Num(st.xpHourRecent) .. ")" .. END) or ""
-  table.insert(lines, Line("XP per hour", BC.Num(st.xpHour)) .. recentXP)
-  local recentKills = (st.killsHourRecent > 0) and (GREY .. "  (last 30 min " .. BC.Num(st.killsHourRecent) .. ")" .. END) or ""
-  table.insert(lines, Line("Boars per hour", BC.Num(st.killsHour)) .. recentKills)
-  local per = (st.xpPerBoar > 0) and BC.Num(st.xpPerBoar) or "?"
-  local toLevel = st.boarsToLevel and (GREY .. "  about " .. BC.Num(st.boarsToLevel) .. " more to level " .. (st.level + 1) .. END) or ""
-  table.insert(lines, Line("XP per boar", per) .. toLevel)
-  table.insert(lines, Line("Next level in", st.secondsToLevel and ("~" .. BC.Time(st.secondsToLevel)) or "?") ..
-    GREY .. "  at this pace" .. END)
-  table.insert(lines, Line("Played", BC.Time(st.played)) .. GREY .. "  this session " .. BC.Time(st.sessionPlayed) .. END)
-  local share = st.boarShare and (GREY .. "  " .. st.boarShare .. "% of your XP is boar" .. END) or ""
-  table.insert(lines, Line("Deaths", st.deaths) .. share)
-  text:SetText(table.concat(lines, "\n"))
+
+  if st.boarsToLevel then
+    bigText:SetText(WHITE .. BC.Num(st.boarsToLevel) .. END .. GOLD .. " boars to level " .. (st.level + 1) .. END)
+  else
+    bigText:SetText(GOLD .. "Kill a boar to see how many to level " .. (st.level + 1) .. END)
+  end
+  if st.secondsToLevel then
+    paceText:SetText(GREY .. "about " .. BC.Time(st.secondsToLevel) .. " at this pace" .. END)
+  else
+    paceText:SetText(GREY .. "the pace shows after a few minutes" .. END)
+  end
+
+  bar:SetMinMaxValues(0, st.xpMax)
+  bar:SetValue(st.xp)
+  barText:SetText("Level " .. st.level .. "   " .. BC.Num(st.xp) .. " / " .. BC.Num(st.xpMax) .. " XP   " .. st.pct .. "%")
+
+  Row(rows.kills, BC.Num(st.kills), (st.sessionKills > 0) and ("+" .. BC.Num(st.sessionKills) .. " this session") or "none this session yet")
+  Row(rows.xph, BC.Num(st.xpHour), (st.xpHourRecent > 0) and ("last 30 min " .. BC.Num(st.xpHourRecent)) or nil)
+  Row(rows.bph, BC.Num(st.killsHour), (st.killsHourRecent > 0) and ("last 30 min " .. BC.Num(st.killsHourRecent)) or nil)
+  Row(rows.xpb, (st.xpPerBoar > 0) and BC.Num(st.xpPerBoar) or "?", nil)
+  Row(rows.played, BC.Time(st.played), "this session " .. BC.Time(st.sessionPlayed))
+  Row(rows.deaths, tostring(st.deaths), st.boarShare and (st.boarShare .. "% of your XP is boar") or nil)
 end
 
 function BC.Refresh()
@@ -51,8 +73,8 @@ local function Build()
     tile = true, tileSize = 16, edgeSize = 14,
     insets = { left = 4, right = 4, top = 4, bottom = 4 },
   })
-  panel:SetBackdropColor(0.05, 0.05, 0.07, 0.85)
-  panel:SetBackdropBorderColor(0.6, 0.45, 0.3, 1)
+  panel:SetBackdropColor(0.04, 0.03, 0.03, 0.9)
+  panel:SetBackdropBorderColor(0.7, 0.5, 0.3, 1)
 
   local pos = BC.db.pos
   if type(pos) == "table" and pos.point then
@@ -75,7 +97,7 @@ local function Build()
     GameTooltip:SetOwner(this, "ANCHOR_LEFT")
     GameTooltip:SetText("Boar Challenge +")
     GameTooltip:AddLine("Right-click to change the numbers. Shift-drag to move. /boar hides it.", 0.8, 0.8, 0.8, 1)
-    GameTooltip:AddLine("XP per hour and boars per hour count this session; the last 30 minutes are in brackets.", 0.8, 0.8, 0.8, 1)
+    GameTooltip:AddLine("XP per hour and boars per hour count this session; the last 30 minutes are in the notes.", 0.8, 0.8, 0.8, 1)
     GameTooltip:Show()
   end)
   panel:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -86,15 +108,59 @@ local function Build()
     Draw()
   end)
 
+  -- Title and character
   local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -8)
-  title:SetText(GOLD .. "Boar Challenge +" .. END .. GREY .. "  " .. (UnitName("player") or "") .. END)
+  title:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -10)
+  title:SetText(GOLD .. "Boar Challenge +" .. END)
+  nameText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  nameText:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -12)
+  nameText:SetText(GREY .. (UnitName("player") or "") .. END)
 
-  text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  text:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -26)
-  text:SetWidth(WIDTH - 20)
-  text:SetJustifyH("LEFT")
-  text:SetJustifyV("TOP")
+  -- The headline: boars to the next level, and the time that takes
+  bigText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  bigText:SetPoint("TOP", panel, "TOP", 0, -30)
+  bigText:SetWidth(WIDTH - 24)
+  bigText:SetJustifyH("CENTER")
+  paceText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  paceText:SetPoint("TOP", bigText, "BOTTOM", 0, -2)
+  paceText:SetWidth(WIDTH - 24)
+  paceText:SetJustifyH("CENTER")
+
+  -- XP bar, in the game's XP purple
+  bar = CreateFrame("StatusBar", nil, panel)
+  bar:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -70)
+  bar:SetWidth(WIDTH - 24)
+  bar:SetHeight(14)
+  bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+  bar:SetStatusBarColor(0.58, 0.1, 0.62)
+  local bg = bar:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints(bar)
+  bg:SetTexture(0, 0, 0, 0.6)
+  barText = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  barText:SetPoint("CENTER", bar, "CENTER", 0, 0)
+
+  -- A thin line, then the rows
+  local line = panel:CreateTexture(nil, "ARTWORK")
+  line:SetTexture(0.7, 0.5, 0.3, 0.5)
+  line:SetHeight(1)
+  line:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -90)
+  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -90)
+
+  for i = 1, table.getn(ROWS) do
+    local y = ROWS_Y - (i - 1) * ROW_H
+    local r = {}
+    r.label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.label:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y - 2)
+    r.label:SetText(GREY .. ROWS[i].label .. END)
+    r.value = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    r.value:SetPoint("TOPRIGHT", panel, "TOPLEFT", VALUE_X, y)
+    r.value:SetJustifyH("RIGHT")
+    r.note = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.note:SetPoint("TOPLEFT", panel, "TOPLEFT", NOTE_X, y - 2)
+    r.note:SetWidth(WIDTH - NOTE_X - 10)
+    r.note:SetJustifyH("LEFT")
+    rows[ROWS[i].key] = r
+  end
 
   if not BC.db.shown then panel:Hide() end
 end
@@ -122,8 +188,9 @@ end
 
 local edit
 local boxes = {}
+local filled = {}        -- what each box was filled with, so an untouched box changes nothing
 local FIELDS = {
-  { key = "kills", label = "Boars killed", tip = "Every boar this character has ever killed. Stealthboar starts at 1000." },
+  { key = "kills", label = "Boars killed", tip = "Every boar this character has ever killed." },
   { key = "deaths", label = "Deaths", tip = "How many times this character has died." },
   { key = "played", label = "Time played", tip = "Time on the challenge, like 14h30m or 90m. Counts while you are logged in and not AFK." },
   { key = "boarXP", label = "XP from boars", tip = "All the experience boars have given, for the boar share and XP per boar." },
@@ -149,30 +216,39 @@ end
 
 local function Fill()
   local c = BC.char
-  boxes.kills:SetText(tostring(c.kills))
-  boxes.deaths:SetText(tostring(c.deaths))
-  boxes.played:SetText(BC.Time(c.played))
-  boxes.boarXP:SetText(tostring(c.boarXP))
-  boxes.otherXP:SetText(tostring(c.otherXP))
+  filled.kills, filled.deaths, filled.played = tostring(c.kills), tostring(c.deaths), BC.Time(c.played)
+  filled.boarXP, filled.otherXP = tostring(c.boarXP), tostring(c.otherXP)
+  for key, text in pairs(filled) do boxes[key]:SetText(text) end
+end
+
+local function Changed(key)
+  local text = BC.Trim(boxes[key]:GetText())
+  if text == filled[key] then return nil end
+  return text
 end
 
 local function Save()
   local c = BC.char
-  local n = tonumber(BC.Trim(boxes.kills:GetText()))
-  if n then c.kills = math.floor(n) end
-  n = tonumber(BC.Trim(boxes.deaths:GetText()))
-  if n then c.deaths = math.floor(n) end
-  n = tonumber(BC.Trim(boxes.boarXP:GetText()))
-  if n then c.boarXP = math.floor(n) end
-  n = tonumber(BC.Trim(boxes.otherXP:GetText()))
-  if n then c.otherXP = math.floor(n) end
-  local t = BC.Trim(boxes.played:GetText())
-  local _, _, h, m = string.find(string.lower(t), "^(%d+)h%s*(%d*)m?$")
-  if h then
-    c.played = tonumber(h) * 3600 + (tonumber(m) or 0) * 60
-  else
-    local _, _, mins = string.find(string.lower(t), "^(%d+)m$")
-    if mins then c.played = tonumber(mins) * 60 elseif tonumber(t) then c.played = tonumber(t) * 3600 end
+  local t = Changed("kills")
+  if t and tonumber(t) then c.kills = math.floor(tonumber(t)) end
+  t = Changed("deaths")
+  if t and tonumber(t) then c.deaths = math.floor(tonumber(t)) end
+  t = Changed("boarXP")
+  if t and tonumber(t) then c.boarXP = math.floor(tonumber(t)) end
+  t = Changed("otherXP")
+  if t and tonumber(t) then c.otherXP = math.floor(tonumber(t)) end
+  t = Changed("played")
+  if t then
+    local lower = string.lower(t)
+    local _, _, h, m = string.find(lower, "^(%d+)h%s*(%d*)m?$")
+    local _, _, mins = string.find(lower, "^(%d+)m$")
+    if h then
+      c.played = tonumber(h) * 3600 + (tonumber(m) or 0) * 60
+    elseif mins then
+      c.played = tonumber(mins) * 60
+    elseif tonumber(t) then
+      c.played = tonumber(t) * 3600
+    end
   end
   BC.Print("numbers saved: " .. BC.Num(c.kills) .. " boars, " .. c.deaths .. " deaths, " .. BC.Time(c.played) .. " played.")
   edit:Hide()

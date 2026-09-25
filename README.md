@@ -7,17 +7,17 @@ Type `/boar` to show or hide the panel.
 
 ## The panel
 
-```
-Boar Challenge +  Stealthboar
-Boars 1,024  (37 this session)
-Level 17 43%  2,400 / 5,600 XP
-XP per hour 2,150  (last 30 min 2,400)
-Boars per hour 48  (last 30 min 52)
-XP per boar 45  about 71 more to level 18
-Next level in ~1h 30m  at this pace
-Played 14h 30m  this session 1h 12m
-Deaths 2  98% of your XP is boar
-```
+The headline is the number that matters, **boars to the next level**, with the time that takes at
+your pace under it. Then an XP bar, then the rest in rows:
+
+| | | |
+|---|---|---|
+| Boars killed | 1,002 | +2 this session |
+| XP per hour | 3,165 | last 30 min 3,165 |
+| Boars per hour | 24 | last 30 min 24 |
+| XP per boar | 133 | |
+| Played | 14h 30m | this session 5m |
+| Deaths | 0 | 100% of your XP is boar |
 
 - **Boars** is every boar this character has killed. A kill is "You have slain X!" in the combat
   log, or "X dies, you gain N experience.", or "X dies." while X is your target (your pet got it).
