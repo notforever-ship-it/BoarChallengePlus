@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.3.0"
+BC.VERSION = "1.4.0"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -18,13 +18,9 @@ local NAME_WORDS = { "boar", "goretusk", "agam'ar" }   -- boars whose names say 
 local WINDOW = 1800                                    -- seconds: the "last 30 min" rate
 local DOUBLE = 1.5                                     -- seconds: the same death seen twice is one kill
 
-local DEFAULTS = { locked = true }
+local DEFAULTS = { locked = true, scale = 1 }
 
--- The rows the panel can show, and which start switched on. Right-click the panel to change them.
-BC.ROW_DEFAULTS = { kills = true, xph = true, bph = true, xpb = true, played = true, deaths = true, here = true, next = true,
-  thisLevel = false, lastLevel = false, rested = false, best = false, sessionXP = false }
-
-BC.session = { startedAt = 0, kills = 0, xp = 0, boarXP = 0, played = 0, deaths = 0 }
+BC.session = { startedAt = 0, kills = 0, xp = 0, boarXP = 0, boarBase = 0, played = 0, deaths = 0 }
 local recent = {}        -- { at, xp, kill }: the last hour, for the "last 30 min" rate
 local lastKill = {}      -- [name] = GetTime() of the last counted kill
 
@@ -82,8 +78,30 @@ local function InitDB()
   if type(c.played) ~= "number" then c.played = 0 end
   if c.shown == nil then c.shown = true end            -- the panel on or off, for this character only
   if type(c.show) ~= "table" then c.show = {} end
-  for key, on in pairs(BC.ROW_DEFAULTS) do
-    if c.show[key] == nil then c.show[key] = on end
+  if c.showVersion ~= 2 then
+    -- 1.3 had rows with notes in them; 1.4 has one switch per thing. Keep what was switched on.
+    local old = c.show
+    c.show = {}
+    local same = { "xph", "bph", "xpb", "played", "deaths", "here", "rested", "best", "sessionXP", "thisLevel" }
+    for i = 1, table.getn(same) do
+      if old[same[i]] ~= nil then c.show[same[i]] = old[same[i]] end
+    end
+    if old.kills ~= nil then c.show.sessionKills = old.kills end
+    if old.played ~= nil then c.show.sessionPlayed = old.played end
+    if old.rested ~= nil then c.show.restedBoars = old.rested end
+    if old.lastLevel ~= nil then
+      c.show.lastBoars = old.lastLevel
+      c.show.lastTime = old.lastLevel
+    end
+    if old.next ~= nil then
+      c.show.now = old.next
+      c.show.next = old.next
+    end
+    c.showVersion = 2
+  end
+  for i = 1, table.getn(BC.ITEMS or {}) do
+    local it = BC.ITEMS[i]
+    if c.show[it.key] == nil then c.show[it.key] = it.on end
   end
   if type(c.byName) ~= "table" then c.byName = {} end
   if type(c.byLevel) ~= "table" then c.byLevel = {} end
@@ -157,11 +175,12 @@ local function Kill(name)
   if BC.Refresh then BC.Refresh() end
 end
 
-local function GainXP(amount, from)
+local function GainXP(amount, from, bonus)
   local c = BC.char
   if from and BC.IsBoar(from) then
     c.boarXP = c.boarXP + amount
     BC.session.boarXP = BC.session.boarXP + amount
+    BC.session.boarBase = BC.session.boarBase + amount - (bonus or 0)
   else
     c.otherXP = c.otherXP + amount
   end
@@ -238,7 +257,9 @@ function BC.Stats()
     st.lastLevelFull = (prev ~= nil)
   end
   st.rested = (GetXPExhaustion and GetXPExhaustion()) or 0
-  st.restedBoars = (st.xpPerBoar > 0 and st.rested > 0) and math.floor(st.rested / st.xpPerBoar) or nil
+  -- rested gives each boar its XP again until the pool runs out, so the pool lasts pool / plain XP boars
+  local plain = (s.kills > 0 and s.boarBase > 0) and (s.boarBase / s.kills) or st.xpPerBoar
+  st.restedBoars = (plain > 0 and st.rested > 0) and math.floor(st.rested / plain) or nil
   st.sessionXP = s.xp
   if s.played >= 600 and st.xpHour > (c.bestXPHour or 0) then c.bestXPHour = st.xpHour end
   st.bestXPHour = c.bestXPHour or 0
@@ -250,7 +271,7 @@ end
 ------------------------------------------------------------------------------------------------------
 
 -- "14h30m", "14.5", "90m", "2h" -> seconds
-local function ParseTime(text)
+function BC.ParseTime(text)
   text = string.lower(BC.Trim(text))
   local _, _, h, m = string.find(text, "^(%d+)h%s*(%d*)m?$")
   if h then return tonumber(h) * 3600 + (tonumber(m) or 0) * 60 end
@@ -277,7 +298,7 @@ local function SetValue(what, value)
     c.otherXP = math.floor(n)
     BC.Print("XP from everything else set to " .. BC.Num(c.otherXP) .. ".")
   elseif what == "played" or what == "time" then
-    local secs = ParseTime(value)
+    local secs = BC.ParseTime(value)
     if not secs then
       BC.Print("say the time like 14h30m, 90m or 14.5 (hours).")
       return
@@ -292,7 +313,7 @@ local function SetValue(what, value)
 end
 
 function BC.ResetSession()
-  BC.session = { startedAt = GetTime(), kills = 0, xp = 0, boarXP = 0, played = 0, deaths = 0 }
+  BC.session = { startedAt = GetTime(), kills = 0, xp = 0, boarXP = 0, boarBase = 0, played = 0, deaths = 0 }
   recent = {}
   BC.Print("session counters start again.")
   if BC.Refresh then BC.Refresh() end
@@ -337,11 +358,11 @@ local function Help()
   BC.Print("v" .. BC.VERSION .. " commands:")
   local lines = {
     "/boar" .. GREY .. "  show or hide the panel" .. END,
-    "/boar edit" .. GREY .. "  change the numbers in a window (or right-click the panel)" .. END,
+    "/boar edit" .. GREY .. "  settings: your numbers, what the panel shows, its size (or right-click the panel)" .. END,
     "/boar set kills 1000" .. GREY .. "  also: deaths, played (14h30m), xp, otherxp" .. END,
     "/boar add <name>" .. GREY .. "  count this creature as a boar;  " .. END .. "/boar remove <name>",
-    "/boar where" .. GREY .. "  boars in this zone and the best zones for your level;  " .. END .. "/boar route" .. GREY .. "  every boar, low to high" .. END,
-    "/boar show <row>" .. GREY .. "  a panel row on or off (right-click the panel for checkboxes)" .. END,
+    "/boar where" .. GREY .. "  boars here, and where to go next;  " .. END .. "/boar route" .. GREY .. "  your road to 60;  " .. END .. "/boar route all" .. GREY .. "  every boar" .. END,
+    "/boar show <thing>" .. GREY .. "  one thing on the panel on or off;  " .. END .. "/boar scale 1.2" .. GREY .. "  the panel's size" .. END,
     "/boar list" .. GREY .. "  boars killed by kind;  " .. END .. "/boar levels" .. GREY .. "  when each level came" .. END,
     "/boar session" .. GREY .. "  start the session counters again;  " .. END .. "/boar lock" .. GREY .. "  lock or unlock the panel (Shift-drag works any time)" .. END,
     "/boar reset" .. GREY .. "  everything for this character back to zero" .. END,
@@ -358,7 +379,7 @@ local function Slash(msg)
   word = string.lower(word or "")
   if word == "" then
     if BC.TogglePanel then BC.TogglePanel() end
-  elseif word == "edit" then
+  elseif word == "edit" or word == "options" or word == "settings" or word == "config" then
     if BC.ShowEdit then BC.ShowEdit() end
   elseif word == "set" then
     local _, _, what, value = string.find(rest, "^(%S+)%s*(.-)$")
@@ -380,18 +401,30 @@ local function Slash(msg)
   elseif word == "where" or word == "next" then
     if BC.PrintWhere then BC.PrintWhere() end
   elseif word == "route" then
-    if BC.PrintRoute then BC.PrintRoute() end
+    if BC.PrintRoute then BC.PrintRoute(string.lower(BC.Trim(rest)) == "all") end
+  elseif word == "scale" or word == "size" then
+    local n = tonumber(rest)
+    if n and n > 3 then n = n / 100 end         -- "/boar scale 120" means 120%
+    if n and BC.SetScale then
+      BC.SetScale(n)
+      BC.Print("panel size " .. math.floor(BC.db.scale * 100 + 0.5) .. "%.")
+    else
+      BC.Print("say the size like " .. GOLD .. "/boar scale 1.2" .. END .. " (0.6 to 2), or use the Size buttons in " .. GOLD .. "/boar edit" .. END .. ".")
+    end
   elseif word == "show" then
-    rest = string.lower(BC.Trim(rest))
-    if rest ~= "" and BC.char.show[rest] ~= nil then
-      BC.char.show[rest] = not BC.char.show[rest]
-      BC.Print("panel row " .. rest .. " is now " .. (BC.char.show[rest] and "on" or "off") .. ".")
+    local key = nil
+    local want = string.lower(BC.Trim(rest))
+    for i = 1, table.getn(BC.ITEMS or {}) do
+      if string.lower(BC.ITEMS[i].key) == want then key = BC.ITEMS[i].key end
+    end
+    if key then
+      BC.char.show[key] = not BC.char.show[key]
+      BC.Print(key .. " is now " .. (BC.char.show[key] and "on" or "off") .. ".")
       if BC.Layout then BC.Layout() end
     else
       local keys = {}
-      for k in pairs(BC.char.show) do table.insert(keys, k) end
-      table.sort(keys)
-      BC.Print("rows: " .. table.concat(keys, ", ") .. ". " .. GOLD .. "/boar show <row>" .. END .. " switches one on or off; right-click the panel for checkboxes.")
+      for i = 1, table.getn(BC.ITEMS or {}) do table.insert(keys, BC.ITEMS[i].key) end
+      BC.Print("things on the panel: " .. table.concat(keys, ", ") .. ". " .. GOLD .. "/boar show <thing>" .. END .. " switches one; right-click the panel for checkboxes.")
     end
   elseif word == "list" then
     ListNames()
@@ -464,7 +497,8 @@ events:SetScript("OnEvent", function()
     -- "Mottled Boar dies, you gain 45 experience. (+22 exp Rested bonus)" or "You gain 250 experience."
     local _, _, name, xp = string.find(arg1 or "", "^(.-) dies, you gain (%d+) experience")
     if name then
-      GainXP(tonumber(xp), name)
+      local _, _, bonus = string.find(arg1, "(%d+) exp Rested bonus")
+      GainXP(tonumber(xp), name, tonumber(bonus))
       Kill(name)
     else
       _, _, xp = string.find(arg1 or "", "^You gain (%d+) experience")

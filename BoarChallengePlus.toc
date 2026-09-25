@@ -1,8 +1,8 @@
 ## Interface: 11200
 ## Title: Boar Challenge +
-## Notes: For a character that levels on boars alone: boars killed, XP and boars per hour, time to the next level, time played. /boar
+## Notes: For a character that levels on boars alone: boars to level, XP and boars per hour, time played, and the road of boar zones to 60. /boar
 ## Author: stealthzi
-## Version: 1.3.0
+## Version: 1.4.0
 ## SavedVariables: BoarChallengePlusDB
 ## SavedVariablesPerCharacter: BoarChallengePlusCharDB
 

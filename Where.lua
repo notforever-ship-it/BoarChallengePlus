@@ -1,11 +1,14 @@
--- Boar Challenge +: where the boars are, and where to go next.
+-- Boar Challenge +: where the boars are, and the road from your level to 60.
 --
 -- With pfQuest installed, every creature's level and spawn points come from its database, including
 -- a server's own zones (pfQuest-turtle, pfQuest-octo). Without it, the list at the bottom is used,
 -- taken from that database (vanilla plus Turtle WoW) on 2026-09-25.
 --
--- The advice follows one rule: boars at your level or a few below, with as many spawns as possible,
--- and never grey ones (no XP). Dungeon boars and the other faction's home zones count for less.
+-- The road is worked out with the game's own XP rules. For every level to 60 it asks what each zone's
+-- boars give you (boars 3-4 levels above you count half, 5 above not at all, grey ones nothing) and how
+-- many of them there are. You stay where you are until a zone with bigger boars is clearly better, so
+-- the road never sends you across the world for the same boars. Zones with boars as good as the stop
+-- it picked are named as well ("Redridge works too").
 
 local BC = BoarChallengePlus
 local GOLD, GREY, WHITE, RED, GREEN, END = BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END
@@ -13,20 +16,44 @@ local GOLD, GREY, WHITE, RED, GREEN, END = BC.GOLD, BC.GREY, BC.WHITE, BC.RED, B
 local WORDS = { "boar", "goretusk", "agam'ar", "swine" }
 local NOT = { "quilboar", "spearhide", "hedgehog", "spirit", "tamed", "armored", "horror" }
 local DUNGEONS = { ["Razorfen Kraul"] = true, ["Razorfen Downs"] = true, ["The Deadmines"] = true }
-local HOME = {   -- starting lands, where the other faction's guards make grinding a chore
+local CITIES = {
+  ["Stormwind City"] = true, Ironforge = true, Darnassus = true, ["Alah'Thalas"] = true,
+  Orgrimmar = true, ["Thunder Bluff"] = true, Undercity = true,
+}
+local HOME = {   -- starting lands: the other faction's guards make grinding there a chore
   Durotar = "Horde", Mulgore = "Horde", ["Tirisfal Glades"] = "Horde",
   Teldrassil = "Alliance", ["Dun Morogh"] = "Alliance", ["Elwynn Forest"] = "Alliance", ["Thalassian Highlands"] = "Alliance",
 }
+local LANDS = {  -- the rest of each faction's own lands
+  Westfall = "Alliance", ["Redridge Mountains"] = "Alliance", ["Loch Modan"] = "Alliance", Northwind = "Alliance",
+  Darkshore = "Alliance", Duskwood = "Alliance",
+  ["The Barrens"] = "Horde", ["Silverpine Forest"] = "Horde",
+}
 local COLOUR = { grey = "|cff9d9d9d", green = "|cff40ff40", yellow = "|cffffff40", orange = "|cffff8000", red = "|cffff4040" }
 
-local live = nil          -- rows from pfQuest's database, built once
+local STAY = 1.3    -- a zone with bigger boars must be this much better before the road moves you on
+local ALSO = 0.55   -- zones with boars as big, and at least this good, are named as well
 
--- Below this level a creature gives no XP. The game's own rule.
+-- XP from each level to the next on the 1.12 client, levels 1 to 59.
+local XP_TABLE = {
+  400, 900, 1400, 2100, 2800, 3600, 4500, 5400, 6500, 7600,
+  8800, 10100, 11400, 12900, 14400, 16000, 17700, 19400, 21300, 23200,
+  25200, 27300, 29400, 31700, 34000, 36400, 38900, 41400, 44300, 47400,
+  50800, 54500, 58600, 62800, 67100, 71600, 76100, 80800, 85700, 90700,
+  95800, 101000, 106300, 111800, 117500, 123200, 129100, 135100, 141200, 147500,
+  153900, 160400, 167100, 173900, 180800, 187900, 195000, 202300, 209800,
+}
+
+------------------------------------------------------------------------------------------------------
+-- The game's XP rules
+------------------------------------------------------------------------------------------------------
+
+-- At or below this level a creature gives no XP.
 function BC.GreyLevel(level)
   if level <= 5 then return 0 end
   if level <= 39 then return level - 5 - math.floor(level / 10) end
-  if level <= 59 then return level - 5 - math.floor(level / 5) end
-  return 51
+  if level <= 59 then return level - 1 - math.floor(level / 5) end
+  return level - 9
 end
 
 -- grey / green / yellow / orange / red, as the game colours a creature of that level for you.
@@ -39,8 +66,64 @@ function BC.LevelColour(mobLevel, level)
   return "green"
 end
 
-local function Coloured(word)
-  return (COLOUR[word] or WHITE) .. word .. END
+local function ZeroDiff(level)
+  if level < 8 then return 5 end
+  if level < 10 then return 6 end
+  if level < 12 then return 7 end
+  if level < 16 then return 8 end
+  if level < 20 then return 9 end
+  if level < 30 then return 11 end
+  if level < 40 then return 12 end
+  if level < 45 then return 13 end
+  if level < 50 then return 14 end
+  if level < 55 then return 15 end
+  if level < 60 then return 16 end
+  return 17
+end
+
+-- The XP one kill of a creature of mobLevel gives at your level, without rested XP.
+function BC.KillXP(level, mobLevel)
+  local base = level * 5 + 45
+  if mobLevel >= level then
+    local d = mobLevel - level
+    if d > 4 then d = 4 end
+    return math.floor((math.floor(base * (20 + d) / 10) + 1) / 2)
+  end
+  if mobLevel > BC.GreyLevel(level) then
+    local zd = ZeroDiff(level)
+    return math.floor(base * (zd + mobLevel - level) / zd)
+  end
+  return 0
+end
+
+-- What a boar of levels lo-hi is worth to you: its average XP, the risky ones counted down.
+local function Worth(level, lo, hi)
+  local sum = 0
+  for v = lo, hi do
+    local x = BC.KillXP(level, v)
+    if v - level >= 5 then
+      x = 0
+    elseif v - level >= 3 then
+      x = x * 0.5
+    end
+    sum = sum + x
+  end
+  return sum / (hi - lo + 1)
+end
+
+
+-- "Great Goretusk 16-17" in the colour the game gives it at that level.
+local function BoarText(row, level)
+  local c = level and COLOUR[BC.LevelColour(row[3], level)] or WHITE
+  local levels = (row[2] == row[3]) and tostring(row[2]) or (row[2] .. "-" .. row[3])
+  return c .. row[1] .. " " .. levels .. END
+end
+
+-- " at Three Corners (25, 61)"
+local function Spot(row)
+  local s = ""
+  if row[5] then s = " at " .. row[5] end
+  return s .. " (" .. row[6] .. ", " .. row[7] .. ")"
 end
 
 local function IsBoarName(name)
@@ -57,6 +140,8 @@ end
 ------------------------------------------------------------------------------------------------------
 -- Rows: { name, lo, hi, zone, area, x, y, spawns }
 ------------------------------------------------------------------------------------------------------
+
+local live = nil          -- rows from pfQuest's database, built once
 
 local function AreaAt(map, x, y)
   local zones, names = pfDB.zones.data, pfDB.zones.loc or pfDB.zones.enUS
@@ -122,133 +207,300 @@ local function LiveRows()
   return live
 end
 
+local function EdgeOfMap(r)
+  local m = r[6]
+  if r[7] < m then m = r[7] end
+  if 100 - r[6] < m then m = 100 - r[6] end
+  if 100 - r[7] < m then m = 100 - r[7] end
+  return m <= 10
+end
+
+local function FromMiddle(r)
+  return (r[6] - 50) * (r[6] - 50) + (r[7] - 50) * (r[7] - 50)
+end
+
+-- pfQuest puts a creature on every map its spawn points fall on, so Loch Modan's boars also turn up
+-- at the edge of Grim Reaches, and Hillsbrad's at the edge of Alterac. Keep each in the zone it is in.
+local function Clean(rows)
+  local out = {}
+  for i = 1, table.getn(rows) do
+    local r = rows[i]
+    local keep = not CITIES[r[4]]
+    if keep then
+      for j = 1, table.getn(rows) do
+        local o = rows[j]
+        if j ~= i and o[1] == r[1] and not CITIES[o[4]] then
+          if o[8] == r[8] and FromMiddle(o) < FromMiddle(r) then
+            keep = false          -- the same spawns on two maps: the one nearer the middle is the real zone
+          elseif EdgeOfMap(r) and o[8] > r[8] then
+            keep = false          -- a few at the edge of this map, more elsewhere
+          elseif r[8] < 6 and o[8] >= 3 * r[8] then
+            keep = false          -- a stray handful
+          end
+        end
+      end
+    end
+    if keep then table.insert(out, r) end
+  end
+  return out
+end
+
+local cleaned, cleanedFrom = nil, nil
+local byZone, byZoneFrom = nil, nil
+
+-- Every boar known, cleaned up, one row per boar and zone.
 function BC.BoarRows()
-  return LiveRows() or BC.BOARS
+  local src = LiveRows() or BC.BOARS
+  if cleanedFrom ~= src then
+    cleaned = Clean(src)
+    cleanedFrom = src
+  end
+  return cleaned
 end
 
 function BC.RowsAreLive()
   return LiveRows() ~= nil
 end
 
-------------------------------------------------------------------------------------------------------
--- Here and next
-------------------------------------------------------------------------------------------------------
-
--- The boars in the zone you stand in: one line, and how good they are for you.
--- Returns text, status ("good", "green", "grey", "hard", "none").
-function BC.Here(level)
-  local zone = GetZoneText() or ""
+local function Zones()
   local rows = BC.BoarRows()
-  local parts, best = {}, "none"
-  local rank = { grey = 1, red = 2, orange = 3, green = 4, yellow = 5 }
-  for i = 1, table.getn(rows) do
-    local r = rows[i]
-    if r[4] == zone then
-      local colour = BC.LevelColour(r[3], level)
-      table.insert(parts, r[1] .. " " .. r[2] .. "-" .. r[3] .. " " .. Coloured(colour))
-      if best == "none" or (rank[colour] or 0) > (rank[best] or 0) then best = colour end
+  if byZoneFrom ~= rows then
+    byZone = {}
+    for i = 1, table.getn(rows) do
+      local z = rows[i][4]
+      if not byZone[z] then byZone[z] = {} end
+      table.insert(byZone[z], rows[i])
     end
+    byZoneFrom = rows
   end
-  if table.getn(parts) == 0 then return nil, "none" end
-  local status = best
-  if best == "yellow" then status = "good" end
-  if best == "red" or best == "orange" then status = "hard" end
-  return table.concat(parts, ", "), status
+  return byZone
 end
 
--- Zones worth going to at this level, best first: { zone, boars (text), spawns, area, x, y, note, score }.
-function BC.NextSpots(level, skipZone)
-  local rows = BC.BoarRows()
-  local faction = UnitFactionGroup("player")
-  local grey = BC.GreyLevel(level)
-  local zones = {}
-  for i = 1, table.getn(rows) do
-    local r = rows[i]
-    local name, lo, hi, zone, area, x, y, spawns = r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]
-    if hi > grey and lo <= level + 2 and zone ~= skipZone then
-      local fit
-      if lo <= level and hi >= level - 3 then fit = 1
-      elseif hi >= level - 5 and lo <= level then fit = 0.6
-      elseif lo > level then fit = 0.45
-      else fit = 0.25 end
-      local count = spawns
-      if count > 60 then count = 60 end
-      local score = fit * count
-      local note = nil
-      if DUNGEONS[zone] then
-        score = score * 0.4
-        note = "dungeon"
-      elseif HOME[zone] and HOME[zone] ~= faction then
-        score = score * 0.5
-        note = HOME[zone] .. " starting land"
-      end
-      local z = zones[zone]
-      if not z then
-        z = { zone = zone, score = 0, parts = {}, spawns = 0, note = note }
-        zones[zone] = z
-      end
-      z.spawns = z.spawns + spawns
-      if score > z.score then
-        z.score = score
-        z.area, z.x, z.y = area, x, y
-        z.top = name .. " " .. lo .. "-" .. hi
-      end
-      table.insert(z.parts, { text = name .. " " .. lo .. "-" .. hi .. " " .. Coloured(BC.LevelColour(hi, level)), score = score })
-    end
-  end
+------------------------------------------------------------------------------------------------------
+-- How good a zone is, and the road
+------------------------------------------------------------------------------------------------------
+
+-- More spawns means less waiting and running; past 40 it makes no odds.
+local function Spread(n)
+  if n > 40 then n = 40 end
+  return math.sqrt(n / 40)
+end
+
+-- How good a zone is at this level: a score, the average XP a boar, and the boars worth killing
+-- there, best first.
+local function ZoneValue(level, zone, faction)
+  local rows = Zones()[zone]
+  if not rows then return 0, 0, nil end
   local list = {}
-  for _, z in pairs(zones) do
-    table.sort(z.parts, function(a, b) return a.score > b.score end)
-    local texts = {}
-    for i = 1, math.min(3, table.getn(z.parts)) do table.insert(texts, z.parts[i].text) end
-    z.boars = table.concat(texts, ", ")
-    table.insert(list, z)
+  for i = 1, table.getn(rows) do
+    local xp = Worth(level, rows[i][2], rows[i][3])
+    if xp > 0 then table.insert(list, { row = rows[i], xp = xp }) end
   end
-  table.sort(list, function(a, b) return a.score > b.score end)
-  return list
+  table.sort(list, function(a, b) return a.xp > b.xp end)
+  local best, bestXP, used = 0, 0, nil
+  local xsum, n = 0, 0
+  for i = 1, table.getn(list) do
+    xsum = xsum + list[i].xp * list[i].row[8]
+    n = n + list[i].row[8]
+    local v = xsum / n * Spread(n)
+    if v > best then best, bestXP, used = v, xsum / n, i end
+  end
+  if not used then return 0, 0, nil end
+  local set = {}
+  for i = 1, used do set[i] = list[i].row end
+  local mult = 1
+  if DUNGEONS[zone] then
+    mult = 0.4
+  elseif HOME[zone] and HOME[zone] ~= faction then
+    mult = 0.3
+  elseif LANDS[zone] and LANDS[zone] ~= faction then
+    mult = 0.5
+  end
+  return best * mult, bestXP, set
 end
 
--- One line for the panel: the best zone that isn't this one.
-function BC.NextLine(level)
-  local list = BC.NextSpots(level, GetZoneText())
-  local z = list[1]
-  if not z then return nil end
-  local where = z.zone
-  if z.area then where = where .. ", " .. z.area end
-  return z.top .. " in " .. where .. " (" .. z.spawns .. " spawns)" .. (z.note and (", " .. z.note) or "")
+local planKey, planStages = nil, nil
+
+-- The road from this level to 60, one stop per zone:
+-- { zone, from, to, xp = { [level] = XP a boar }, rows = { boars killed there }, also = { zones as good } }
+function BC.Plan(level, here)
+  local faction = UnitFactionGroup("player") or ""
+  local key = level .. "|" .. (here or "") .. "|" .. faction .. "|" .. tostring(BC.BoarRows())
+  if planKey == key then return planStages end
+  local zones = Zones()
+  local stages, stage = {}, nil
+  local cur = (here and zones[here]) and here or nil
+  for L = level, 59 do
+    local best, bv = nil, 0
+    for z in pairs(zones) do
+      local v = ZoneValue(L, z, faction)
+      if v > bv then best, bv = z, v end
+    end
+    local cv, cset = 0, nil
+    if cur then
+      local _
+      cv, _, cset = ZoneValue(L, cur, faction)
+    end
+    if cv <= 0 then
+      cur = best
+    elseif best and best ~= cur and bv > cv * STAY then
+      local _, _, bset = ZoneValue(L, best, faction)
+      if bset and cset and bset[1][3] > cset[1][3] then cur = best end   -- only for bigger boars
+    end
+    if not cur then break end
+    local v, xp, set = ZoneValue(L, cur, faction)
+    if not stage or stage.zone ~= cur then
+      stage = { zone = cur, from = L, xp = {}, rows = {}, seen = {}, also = {} }
+      table.insert(stages, stage)
+      local top = set and set[1][3] or 0
+      for z in pairs(zones) do
+        if z ~= cur then
+          local ov, _, oset = ZoneValue(L, z, faction)
+          if oset and ov >= v * ALSO and oset[1][3] >= top then table.insert(stage.also, { zone = z, v = ov }) end
+        end
+      end
+      table.sort(stage.also, function(a, b) return a.v > b.v end)
+    end
+    stage.to = L + 1
+    stage.xp[L] = xp
+    if set then
+      for i = 1, table.getn(set) do
+        if not stage.seen[set[i][1]] then
+          stage.seen[set[i][1]] = true
+          table.insert(stage.rows, set[i])
+        end
+      end
+    end
+  end
+  planKey, planStages = key, stages
+  return stages
 end
+
+-- About how many boars a stop takes, by the game's XP rules. Rested XP left comes off the first stop.
+function BC.StageBoars(stage, level)
+  local have, max = UnitXP("player") or 0, UnitXPMax("player") or 0
+  local scale = 1
+  if XP_TABLE[level] and max > 0 then scale = max / XP_TABLE[level] end   -- a server with its own XP table
+  local total = 0
+  for L = stage.from, stage.to - 1 do
+    local need = (XP_TABLE[L] or 0) * scale
+    if L == level then need = max - have end
+    local xp = stage.xp[L]
+    if xp and xp > 0 then total = total + need / xp end
+  end
+  if stage.from == level and stage.xp[level] and stage.xp[level] > 0 then
+    local rested = (GetXPExhaustion and GetXPExhaustion()) or 0
+    total = total - rested / stage.xp[level]
+  end
+  if total < 0 then total = 0 end
+  return math.floor(total + 0.5)
+end
+
+-- "Redridge Mountains or Loch Modan"
+local function AlsoText(stage, most)
+  local names = {}
+  for i = 1, math.min(most or 2, table.getn(stage.also)) do table.insert(names, stage.also[i].zone) end
+  if table.getn(names) == 0 then return nil end
+  return table.concat(names, " or ")
+end
+
+------------------------------------------------------------------------------------------------------
+-- The advice lines
+------------------------------------------------------------------------------------------------------
+
+-- The boars in the zone you stand in, biggest first, coloured the way the game colours them for you.
+function BC.HereLine(level)
+  local zone = GetZoneText() or ""
+  local rows = Zones()[zone]
+  if not rows then return GREY .. "no boars in " .. (zone ~= "" and zone or "this zone") .. END end
+  local list = {}
+  for i = 1, table.getn(rows) do table.insert(list, rows[i]) end
+  table.sort(list, function(a, b) return a[3] > b[3] end)
+  local parts = {}
+  for i = 1, math.min(3, table.getn(list)) do table.insert(parts, BoarText(list[i], level)) end
+  local text = table.concat(parts, GREY .. ", " .. END)
+  if BC.LevelColour(list[1][3], level) == "grey" then text = text .. RED .. "  no XP here" .. END end
+  return text
+end
+
+-- What to do now: stay here until a level, or go somewhere.
+function BC.NowLine(level)
+  if level >= 60 then return GOLD .. "Level 60. The challenge is done!" .. END end
+  local here = GetZoneText()
+  local s = BC.Plan(level, here)[1]
+  if not s then return GREY .. "no boars known for level " .. level .. END end
+  local boars = BC.Num(BC.StageBoars(s, level))
+  local also = AlsoText(s, 1)
+  if s.zone == here then
+    local text
+    if s.to >= 60 then
+      text = "Stay here to level 60, about " .. boars .. " boars"
+    else
+      text = "Stay here until level " .. GOLD .. s.to .. END .. ", about " .. boars .. " boars"
+    end
+    if also then text = text .. GREY .. " (or " .. also .. ")" .. END end
+    return text
+  end
+  local r = s.rows[1]
+  return "Go to " .. GOLD .. s.zone .. END .. ": " .. BoarText(r, level) .. GREY .. Spot(r) .. END
+end
+
+-- The stop after this one.
+function BC.NextLine(level)
+  if level >= 60 then return GREY .. "nothing: you made it" .. END end
+  local stages = BC.Plan(level, GetZoneText())
+  local s = stages[2]
+  if not s then return GREY .. "nothing after this: it takes you to 60" .. END end
+  local text = "At " .. GOLD .. s.from .. END .. ": " .. GOLD .. s.zone .. END .. ", " .. BoarText(s.rows[1], s.from)
+  local also = AlsoText(s, 1)
+  if also then text = text .. GREY .. " (or " .. also .. ")" .. END end
+  return text
+end
+
+-- The stops after that, short.
+function BC.LaterLine(level)
+  local stages = BC.Plan(level, GetZoneText())
+  local parts = {}
+  for i = 3, math.min(5, table.getn(stages)) do
+    table.insert(parts, GOLD .. stages[i].zone .. END .. " at " .. stages[i].from)
+  end
+  if table.getn(parts) == 0 then return GREY .. "nothing more after that" .. END end
+  return table.concat(parts, ", ")
+end
+
+-- The whole road as { left, right } text pairs, for the panel's tooltip and /boar route.
+function BC.RouteLines(level)
+  local out = {}
+  local stages = BC.Plan(level, GetZoneText())
+  for i = 1, table.getn(stages) do
+    local s = stages[i]
+    local left = s.from .. " to " .. s.to .. "  " .. s.zone
+    local right = "about " .. BC.Num(BC.StageBoars(s, level)) .. " boars"
+    table.insert(out, { left = left, right = right, stage = s })
+  end
+  return out
+end
+
+------------------------------------------------------------------------------------------------------
+-- Chat
+------------------------------------------------------------------------------------------------------
 
 function BC.PrintWhere()
   local level = UnitLevel("player") or 1
-  local here, status = BC.Here(level)
-  if here then
-    local verdict = ({ good = "good for you", green = "easy for you, fine while they give XP", grey = RED .. "grey: no XP, time to move" .. END,
-      hard = "above your level, careful" })[status] or ""
-    BC.Print("boars in " .. WHITE .. (GetZoneText() or "?") .. END .. ": " .. here .. GREY .. " - " .. END .. verdict .. ".")
-  else
-    BC.Print("no boars known in " .. WHITE .. (GetZoneText() or "?") .. END .. ".")
-  end
-  local list = BC.NextSpots(level, nil)
-  if table.getn(list) == 0 then
-    BC.Print("nothing known at level " .. level .. ". Say " .. GOLD .. "/boar route" .. END .. " for the whole list.")
-    return
-  end
-  BC.Print("best boars for level " .. level .. " (your level or a few below, most spawns first):")
-  for i = 1, math.min(4, table.getn(list)) do
-    local z = list[i]
-    local where = z.zone
-    if z.area then where = where .. " around " .. z.area end
-    DEFAULT_CHAT_FRAME:AddMessage("  " .. WHITE .. where .. END .. GREY .. " (" .. z.x .. ", " .. z.y .. ")" .. END .. ": " .. z.boars ..
-      GREY .. ", " .. z.spawns .. " spawns" .. (z.note and (", " .. z.note) or "") .. END)
-  end
-  BC.Print(GREY .. (BC.RowsAreLive() and "from pfQuest's database on this server." or "from the built-in list (vanilla and Turtle WoW); install pfQuest for this server's own.") .. END)
+  BC.Print("boars in " .. WHITE .. (GetZoneText() or "?") .. END .. ": " .. BC.HereLine(level))
+  DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. "Now" .. END .. "  " .. BC.NowLine(level))
+  DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. "Next" .. END .. "  " .. BC.NextLine(level))
+  DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. "Later" .. END .. "  " .. BC.LaterLine(level))
+  BC.Print(GREY .. "/boar route shows every stop with its boars and map position. " ..
+    (BC.RowsAreLive() and "From pfQuest's database on this server." or "From the built-in list; install pfQuest for this server's own.") .. END)
 end
 
--- The whole road, low to high: every boar, its levels and zone.
-function BC.PrintRoute()
+-- Every boar known, low to high, as it comes from the database.
+local function PrintAll()
   local level = UnitLevel("player") or 1
   local rows = {}
-  for i = 1, table.getn(BC.BoarRows()) do table.insert(rows, BC.BoarRows()[i]) end
+  local src = BC.BoarRows()
+  for i = 1, table.getn(src) do table.insert(rows, src[i]) end
   table.sort(rows, function(a, b)
     if a[2] ~= b[2] then return a[2] < b[2] end
     return a[8] > b[8]
@@ -258,9 +510,34 @@ function BC.PrintRoute()
     local r = rows[i]
     local where = r[4]
     if r[5] then where = where .. ", " .. r[5] end
-    DEFAULT_CHAT_FRAME:AddMessage("  " .. Coloured(BC.LevelColour(r[3], level)) .. GREY .. " " .. r[2] .. "-" .. r[3] .. END .. "  " .. WHITE .. r[1] .. END ..
-      GREY .. "  " .. where .. " (" .. r[6] .. ", " .. r[7] .. "), " .. r[8] .. " spawns" .. (DUNGEONS[r[4]] and ", dungeon" or "") .. END)
+    DEFAULT_CHAT_FRAME:AddMessage("  " .. BoarText(r, level) .. GREY .. "  " .. where .. " (" .. r[6] .. ", " .. r[7] .. "), " ..
+      r[8] .. " spawns" .. (DUNGEONS[r[4]] and ", dungeon" or "") .. END)
   end
+end
+
+-- The road from your level: every stop, its boars, where they are and about how many to kill.
+function BC.PrintRoute(all)
+  if all then
+    PrintAll()
+    return
+  end
+  local level = UnitLevel("player") or 1
+  local lines = BC.RouteLines(level)
+  if table.getn(lines) == 0 then
+    BC.Print("no road known from level " .. level .. ". " .. GOLD .. "/boar route all" .. END .. " lists every boar.")
+    return
+  end
+  BC.Print("your road from level " .. level .. " (boar counts by the game's XP rules, rested XP counted for now):")
+  for i = 1, table.getn(lines) do
+    local s = lines[i].stage
+    local names = {}
+    for j = 1, math.min(3, table.getn(s.rows)) do table.insert(names, BoarText(s.rows[j], nil)) end
+    local also = AlsoText(s, 2)
+    DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. s.from .. " to " .. s.to .. END .. "  " .. WHITE .. s.zone .. END .. ": " ..
+      table.concat(names, ", ") .. GREY .. Spot(s.rows[1]) .. ", " .. lines[i].right ..
+      (also and (", or " .. also) or "") .. END)
+  end
+  BC.Print(GREY .. "/boar route all lists every boar known." .. END)
 end
 
 ------------------------------------------------------------------------------------------------------
