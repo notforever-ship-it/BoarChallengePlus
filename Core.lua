@@ -9,7 +9,7 @@
 
 BoarChallenge = {}
 local BC = BoarChallenge
-BC.VERSION = "1.0.1"
+BC.VERSION = "1.0.2"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -399,11 +399,11 @@ events:SetScript("OnEvent", function()
     if BC.InitPanel then BC.InitPanel() end
     BC.Print("v" .. BC.VERSION .. " counting for " .. GOLD .. (UnitName("player") or "you") .. END .. ": " ..
       BC.Num(BC.char.kills) .. " boars so far. " .. GOLD .. "/boar" .. END .. " for the panel, " .. GOLD .. "/boar help" .. END .. " for commands.")
-    -- Stealthboar had 993 boars on the old addon before this one existed. Everyone else starts at 0.
+    -- Stealthboar had 1000 boars before this addon existed (993 on the old addon, a few more since). Everyone else starts at 0.
     if BC.char.kills == 0 and not BC.char.seeded and UnitName("player") == "Stealthboar" then
       BC.char.seeded = true
-      BC.char.kills = 993
-      BC.Print("starting from the 993 boars counted before this addon. Right-click the panel if that is off.")
+      BC.char.kills = 1000
+      BC.Print("starting from the 1000 boars killed before this addon. Right-click the panel if that is off.")
     end
     OldAddonHint()
   elseif not BC.char then
