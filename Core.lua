@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.2.2"
+BC.VERSION = "1.3.0"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -19,6 +19,10 @@ local WINDOW = 1800                                    -- seconds: the "last 30 
 local DOUBLE = 1.5                                     -- seconds: the same death seen twice is one kill
 
 local DEFAULTS = { locked = true }
+
+-- The rows the panel can show, and which start switched on. Right-click the panel to change them.
+BC.ROW_DEFAULTS = { kills = true, xph = true, bph = true, xpb = true, played = true, deaths = true, here = true, next = true,
+  thisLevel = false, lastLevel = false, rested = false, best = false, sessionXP = false }
 
 BC.session = { startedAt = 0, kills = 0, xp = 0, boarXP = 0, played = 0, deaths = 0 }
 local recent = {}        -- { at, xp, kill }: the last hour, for the "last 30 min" rate
@@ -77,6 +81,10 @@ local function InitDB()
   if type(c.deaths) ~= "number" then c.deaths = 0 end
   if type(c.played) ~= "number" then c.played = 0 end
   if c.shown == nil then c.shown = true end            -- the panel on or off, for this character only
+  if type(c.show) ~= "table" then c.show = {} end
+  for key, on in pairs(BC.ROW_DEFAULTS) do
+    if c.show[key] == nil then c.show[key] = on end
+  end
   if type(c.byName) ~= "table" then c.byName = {} end
   if type(c.byLevel) ~= "table" then c.byLevel = {} end
   if type(c.levels) ~= "table" then c.levels = {} end
@@ -219,6 +227,21 @@ function BC.Stats()
   st.secondsToLevel = (rate > 0) and (left / rate * 3600) or nil
   local total = c.boarXP + c.otherXP
   st.boarShare = (total > 0) and math.floor(c.boarXP / total * 100 + 0.5) or nil
+  -- the extra rows
+  st.thisLevelKills = c.byLevel[st.level] or 0
+  local n = table.getn(c.levels)
+  if n >= 1 then
+    local last, prev = c.levels[n], c.levels[n - 1]
+    st.lastLevel = last.level
+    st.lastLevelKills = last.kills - (prev and prev.kills or 0)
+    st.lastLevelTime = last.played - (prev and prev.played or 0)
+    st.lastLevelFull = (prev ~= nil)
+  end
+  st.rested = (GetXPExhaustion and GetXPExhaustion()) or 0
+  st.restedBoars = (st.xpPerBoar > 0 and st.rested > 0) and math.floor(st.rested / st.xpPerBoar) or nil
+  st.sessionXP = s.xp
+  if s.played >= 600 and st.xpHour > (c.bestXPHour or 0) then c.bestXPHour = st.xpHour end
+  st.bestXPHour = c.bestXPHour or 0
   return st
 end
 
@@ -317,6 +340,8 @@ local function Help()
     "/boar edit" .. GREY .. "  change the numbers in a window (or right-click the panel)" .. END,
     "/boar set kills 1000" .. GREY .. "  also: deaths, played (14h30m), xp, otherxp" .. END,
     "/boar add <name>" .. GREY .. "  count this creature as a boar;  " .. END .. "/boar remove <name>",
+    "/boar where" .. GREY .. "  boars in this zone and the best zones for your level;  " .. END .. "/boar route" .. GREY .. "  every boar, low to high" .. END,
+    "/boar show <row>" .. GREY .. "  a panel row on or off (right-click the panel for checkboxes)" .. END,
     "/boar list" .. GREY .. "  boars killed by kind;  " .. END .. "/boar levels" .. GREY .. "  when each level came" .. END,
     "/boar session" .. GREY .. "  start the session counters again;  " .. END .. "/boar lock" .. GREY .. "  lock or unlock the panel (Shift-drag works any time)" .. END,
     "/boar reset" .. GREY .. "  everything for this character back to zero" .. END,
@@ -352,6 +377,22 @@ local function Slash(msg)
     BC.char.extra[rest] = nil
     BC.char.names[rest] = nil
     BC.Print(WHITE .. rest .. END .. " no longer counts (unless its name has boar in it).")
+  elseif word == "where" or word == "next" then
+    if BC.PrintWhere then BC.PrintWhere() end
+  elseif word == "route" then
+    if BC.PrintRoute then BC.PrintRoute() end
+  elseif word == "show" then
+    rest = string.lower(BC.Trim(rest))
+    if rest ~= "" and BC.char.show[rest] ~= nil then
+      BC.char.show[rest] = not BC.char.show[rest]
+      BC.Print("panel row " .. rest .. " is now " .. (BC.char.show[rest] and "on" or "off") .. ".")
+      if BC.Layout then BC.Layout() end
+    else
+      local keys = {}
+      for k in pairs(BC.char.show) do table.insert(keys, k) end
+      table.sort(keys)
+      BC.Print("rows: " .. table.concat(keys, ", ") .. ". " .. GOLD .. "/boar show <row>" .. END .. " switches one on or off; right-click the panel for checkboxes.")
+    end
   elseif word == "list" then
     ListNames()
   elseif word == "levels" then
@@ -391,6 +432,7 @@ events:RegisterEvent("PLAYER_LEVEL_UP")
 events:RegisterEvent("PLAYER_DEAD")
 events:RegisterEvent("PLAYER_TARGET_CHANGED")
 events:RegisterEvent("PLAYER_XP_UPDATE")
+events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 events:SetScript("OnEvent", function()
   if event == "VARIABLES_LOADED" then
     InitDB()
@@ -436,7 +478,7 @@ events:SetScript("OnEvent", function()
     if BC.Refresh then BC.Refresh() end
   elseif event == "PLAYER_TARGET_CHANGED" then
     LearnTarget()
-  elseif event == "PLAYER_XP_UPDATE" then
+  elseif event == "PLAYER_XP_UPDATE" or event == "ZONE_CHANGED_NEW_AREA" then
     if BC.Refresh then BC.Refresh() end
   end
 end)

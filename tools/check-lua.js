@@ -42,7 +42,7 @@ const KNOWN_GLOBALS = new Set((
   "GetInventoryItemLink GetInventoryItemTexture UnitIsDeadOrGhost UnitOnTaxi GetPetExperience IsTradeskillTrainer UnitRangedDamage GetSpellCooldown GetSpellTexture UnitMana " +
   "SUPERWOW_VERSION " +
   // Easy Route: quest log, quest window, map position, pfQuest
-  "UnitXP UnitXPMax UnitIsAFK BoaringChallengeDB " +
+  "UnitXP UnitXPMax UnitIsAFK BoaringChallengeDB GetXPExhaustion UnitFactionGroup pfDB " +
   "GetNumQuestLogEntries GetQuestLogTitle ExpandQuestHeader CollapseQuestHeader GetNumQuestLeaderBoards GetQuestLogLeaderBoard " +
   "GetQuestLogSelection AcceptQuest GetQuestReward GetTitleText SetMapToCurrentZone GetPlayerMapPosition WorldMapFrame " +
   "GetSubZoneText UnitRace pfDatabase pfDB QuestLogFrame QuestLog_Update QuestLog_SetSelection SelectQuestLogEntry GetQuestLogQuestText " +

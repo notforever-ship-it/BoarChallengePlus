@@ -1,30 +1,133 @@
--- Boar Challenge +: the panel on screen, and the window for changing the numbers.
+-- Boar Challenge +: the panel on screen, and the window for changing the numbers and the rows.
 --
--- The panel leads with the number that matters, boars left to the next level, then an XP bar, then
--- the rest as label / value / note rows.
+-- The panel is wide rather than tall: the headline (boars to the next level) and the XP bar across
+-- the top, then the number rows in two columns, then the "here" and "next" lines across the bottom.
+-- Every row can be switched off; the panel closes up around what is left.
 
 local BC = BoarChallengePlus
 local GOLD, GREY, WHITE, RED, GREEN, END = BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END
 
-local WIDTH = 262
-local ROW_H, ROWS_Y, VALUE_X, NOTE_X = 16, -96, 152, 160
-local ROWS = {
-  { key = "kills", label = "Boars killed" },
-  { key = "xph", label = "XP per hour" },
-  { key = "bph", label = "Boars per hour" },
-  { key = "xpb", label = "XP per boar" },
-  { key = "played", label = "Played" },
-  { key = "deaths", label = "Deaths" },
-}
-local HEIGHT = -ROWS_Y + table.getn(ROWS) * ROW_H + 10
+local WIDTH = 444
+local COLS = { 12, 228 }          -- x of the two columns of number rows
+local VALUE_W, NOTE_W = 104, 100  -- the value ends at col + VALUE_W, the note starts just after
+local ROW_H, WIDE_H = 15, 26
+local ROWS_Y = -68                -- where the rows start, under the bar
 
-local panel, nameText, bigText, paceText, bar, barText
+-- Every row the panel can show, in the order it shows them. "num" rows take half a line.
+BC.ROWS = {
+  { key = "kills", label = "Boars killed", kind = "num", tip = "Every boar this character has killed, and this session's." },
+  { key = "xph", label = "XP per hour", kind = "num", tip = "This session's rate, with the last 30 minutes after it." },
+  { key = "bph", label = "Boars per hour", kind = "num", tip = "This session's rate, with the last 30 minutes after it." },
+  { key = "xpb", label = "XP per boar", kind = "num", tip = "What a boar gives on average this session." },
+  { key = "played", label = "Played", kind = "num", tip = "Time on the challenge, and this session. Not counted while AFK." },
+  { key = "deaths", label = "Deaths", kind = "num", tip = "Deaths, and how much of your XP came from boars." },
+  { key = "thisLevel", label = "Boars this level", kind = "num", tip = "Boars killed since you reached this level." },
+  { key = "lastLevel", label = "Last level took", kind = "num", tip = "Boars and time from the level before to this one." },
+  { key = "rested", label = "Rested XP", kind = "num", tip = "Rested XP left (boars give double until it runs out), and how many boars that covers." },
+  { key = "best", label = "Best XP per hour", kind = "num", tip = "The best session rate you have had, after 10 minutes of a session." },
+  { key = "sessionXP", label = "XP this session", kind = "num", tip = "All XP gained this session." },
+  { key = "here", label = "Here", kind = "wide", tip = "The boars in the zone you are in, coloured by level like the game does." },
+  { key = "next", label = "Next", kind = "wide", tip = "The best zone for your level that is not this one: boars at your level or a few below, most spawns. /boar where says more." },
+}
+
+local panel, bigText, paceText, bar, barText
 local rows = {}
 local elapsed = 0
+local cache = { key = nil, here = nil, next = nil }
 
-local function Row(row, value, note)
-  row.value:SetText(value)
-  row.note:SetText(note and (GREY .. note .. END) or "")
+local function Coloured(text, colour)
+  return (colour or WHITE) .. text .. END
+end
+
+-- What each row says right now: value and note for number rows, one text for wide rows.
+local function Content(key, st)
+  if key == "kills" then
+    return BC.Num(st.kills), (st.sessionKills > 0) and ("+" .. BC.Num(st.sessionKills) .. " this session") or "none this session"
+  elseif key == "xph" then
+    return BC.Num(st.xpHour), (st.xpHourRecent > 0) and ("last 30 min " .. BC.Num(st.xpHourRecent)) or nil
+  elseif key == "bph" then
+    return BC.Num(st.killsHour), (st.killsHourRecent > 0) and ("last 30 min " .. BC.Num(st.killsHourRecent)) or nil
+  elseif key == "xpb" then
+    return (st.xpPerBoar > 0) and BC.Num(st.xpPerBoar) or "?", nil
+  elseif key == "played" then
+    return BC.Time(st.played), "this session " .. BC.Time(st.sessionPlayed)
+  elseif key == "deaths" then
+    return tostring(st.deaths), st.boarShare and (st.boarShare .. "% of XP is boar") or nil
+  elseif key == "thisLevel" then
+    return BC.Num(st.thisLevelKills), "at level " .. st.level
+  elseif key == "lastLevel" then
+    if not st.lastLevel then return "?", "no level-up seen yet" end
+    if not st.lastLevelFull then return "level " .. st.lastLevel, "reached at " .. BC.Num(st.lastLevelKills) .. " boars" end
+    return BC.Num(st.lastLevelKills) .. " boars", BC.Time(st.lastLevelTime) .. " to level " .. st.lastLevel
+  elseif key == "rested" then
+    if st.rested <= 0 then return "none", "rest in an inn or city" end
+    return BC.Num(st.rested), st.restedBoars and ("double XP for ~" .. BC.Num(st.restedBoars) .. " boars") or nil
+  elseif key == "best" then
+    return (st.bestXPHour > 0) and BC.Num(st.bestXPHour) or "?", "best session rate so far"
+  elseif key == "sessionXP" then
+    return BC.Num(st.sessionXP), nil
+  elseif key == "here" or key == "next" then
+    -- worked out again only when the level or the zone changes
+    local ck = st.level .. "|" .. (GetZoneText() or "")
+    if cache.key ~= ck then
+      cache.key = ck
+      local here, status = BC.Here(st.level)
+      if here then
+        local verdict = ({ good = "", green = "", grey = RED .. " - no XP, move on" .. END, hard = GREY .. " - above you" .. END })[status] or ""
+        cache.here = here .. verdict
+      else
+        cache.here = GREY .. "no boars known in " .. (GetZoneText() or "this zone") .. END
+      end
+      local nxt = BC.NextLine(st.level)
+      cache.next = nxt and (WHITE .. nxt .. END) or (GREY .. "nothing known for level " .. st.level .. END)
+    end
+    if key == "here" then return cache.here end
+    return cache.next
+  end
+  return "", nil
+end
+
+-- Puts the switched-on rows in place, two number rows to a line, and sizes the panel to fit.
+function BC.Layout()
+  if not panel or not BC.char then return end
+  local y, col = ROWS_Y, 1
+  for i = 1, table.getn(BC.ROWS) do
+    local def, r = BC.ROWS[i], rows[BC.ROWS[i].key]
+    if BC.char.show[def.key] then
+      r.on = true
+      if def.kind == "num" then
+        local x = COLS[col]
+        r.label:ClearAllPoints()
+        r.label:SetPoint("TOPLEFT", panel, "TOPLEFT", x, y - 2)
+        r.value:ClearAllPoints()
+        r.value:SetPoint("TOPRIGHT", panel, "TOPLEFT", x + VALUE_W, y)
+        r.note:ClearAllPoints()
+        r.note:SetPoint("TOPLEFT", panel, "TOPLEFT", x + VALUE_W + 6, y - 2)
+        r.label:Show()
+        r.value:Show()
+        r.note:Show()
+        if col == 1 then col = 2 else col = 1; y = y - ROW_H end
+      else
+        if col == 2 then col = 1; y = y - ROW_H end
+        r.label:ClearAllPoints()
+        r.label:SetPoint("TOPLEFT", panel, "TOPLEFT", COLS[1], y - 2)
+        r.value:ClearAllPoints()
+        r.value:SetPoint("TOPLEFT", panel, "TOPLEFT", COLS[1] + 36, y - 2)
+        r.label:Show()
+        r.value:Show()
+        r.note:Hide()
+        y = y - WIDE_H
+      end
+    else
+      r.on = false
+      r.label:Hide()
+      r.value:Hide()
+      r.note:Hide()
+    end
+  end
+  if col == 2 then y = y - ROW_H end
+  panel:SetHeight(-y + 8)
+  BC.Refresh()
 end
 
 local function Draw()
@@ -41,17 +144,22 @@ local function Draw()
   else
     paceText:SetText(GREY .. "the pace shows after a few minutes" .. END)
   end
-
   bar:SetMinMaxValues(0, st.xpMax)
   bar:SetValue(st.xp)
   barText:SetText("Level " .. st.level .. "   " .. BC.Num(st.xp) .. " / " .. BC.Num(st.xpMax) .. " XP   " .. st.pct .. "%")
 
-  Row(rows.kills, BC.Num(st.kills), (st.sessionKills > 0) and ("+" .. BC.Num(st.sessionKills) .. " this session") or "none this session yet")
-  Row(rows.xph, BC.Num(st.xpHour), (st.xpHourRecent > 0) and ("last 30 min " .. BC.Num(st.xpHourRecent)) or nil)
-  Row(rows.bph, BC.Num(st.killsHour), (st.killsHourRecent > 0) and ("last 30 min " .. BC.Num(st.killsHourRecent)) or nil)
-  Row(rows.xpb, (st.xpPerBoar > 0) and BC.Num(st.xpPerBoar) or "?", nil)
-  Row(rows.played, BC.Time(st.played), "this session " .. BC.Time(st.sessionPlayed))
-  Row(rows.deaths, tostring(st.deaths), st.boarShare and (st.boarShare .. "% of your XP is boar") or nil)
+  for i = 1, table.getn(BC.ROWS) do
+    local def, r = BC.ROWS[i], rows[BC.ROWS[i].key]
+    if r.on then
+      local value, note = Content(def.key, st)
+      if def.kind == "num" then
+        r.value:SetText(value)
+        r.note:SetText(note and (GREY .. note .. END) or "")
+      else
+        r.value:SetText(value)
+      end
+    end
+  end
 end
 
 function BC.Refresh()
@@ -61,7 +169,7 @@ end
 local function Build()
   panel = CreateFrame("Frame", "BoarChallengePlusPanel", UIParent)
   panel:SetWidth(WIDTH)
-  panel:SetHeight(HEIGHT)
+  panel:SetHeight(200)
   panel:SetFrameStrata("MEDIUM")
   panel:SetClampedToScreen(true)
   panel:SetMovable(true)
@@ -80,7 +188,7 @@ local function Build()
   if type(pos) == "table" and pos.point then
     panel:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x or 0, pos.y or 0)
   else
-    panel:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -20, -220)
+    panel:SetPoint("TOP", UIParent, "TOP", 0, -30)
   end
   panel:SetScript("OnDragStart", function()
     if not BC.db.locked or IsShiftKeyDown() then this:StartMoving() end
@@ -94,10 +202,10 @@ local function Build()
     if arg1 == "RightButton" and BC.ShowEdit then BC.ShowEdit() end
   end)
   panel:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(this, "ANCHOR_BOTTOM")
     GameTooltip:SetText("Boar Challenge +")
-    GameTooltip:AddLine("Right-click to change the numbers. Shift-drag to move. /boar hides it.", 0.8, 0.8, 0.8, 1)
-    GameTooltip:AddLine("XP per hour and boars per hour count this session; the last 30 minutes are in the notes.", 0.8, 0.8, 0.8, 1)
+    GameTooltip:AddLine("Right-click to change the numbers and pick the rows. Shift-drag to move. /boar hides it.", 0.8, 0.8, 0.8, 1)
+    GameTooltip:AddLine("/boar where lists the boars in this zone and the best zones for your level.", 0.8, 0.8, 0.8, 1)
     GameTooltip:Show()
   end)
   panel:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -108,29 +216,25 @@ local function Build()
     Draw()
   end)
 
-  -- Title and character
+  -- Title left, character right
   local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -10)
+  title:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -9)
   title:SetText(GOLD .. "Boar Challenge +" .. END)
-  nameText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  nameText:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -12)
+  local nameText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  nameText:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -11)
   nameText:SetText(GREY .. (UnitName("player") or "") .. END)
 
-  -- The headline: boars to the next level, and the time that takes
+  -- The headline and its pace, on one line
   bigText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  bigText:SetPoint("TOP", panel, "TOP", 0, -30)
-  bigText:SetWidth(WIDTH - 24)
-  bigText:SetJustifyH("CENTER")
+  bigText:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -26)
   paceText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  paceText:SetPoint("TOP", bigText, "BOTTOM", 0, -2)
-  paceText:SetWidth(WIDTH - 24)
-  paceText:SetJustifyH("CENTER")
+  paceText:SetPoint("LEFT", bigText, "RIGHT", 10, -1)
 
-  -- XP bar, in the game's XP purple
+  -- XP bar across the panel, in the game's XP purple
   bar = CreateFrame("StatusBar", nil, panel)
-  bar:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -70)
+  bar:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -48)
   bar:SetWidth(WIDTH - 24)
-  bar:SetHeight(14)
+  bar:SetHeight(13)
   bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
   bar:SetStatusBarColor(0.58, 0.1, 0.62)
   local bg = bar:CreateTexture(nil, "BACKGROUND")
@@ -139,30 +243,30 @@ local function Build()
   barText = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   barText:SetPoint("CENTER", bar, "CENTER", 0, 0)
 
-  -- A thin line, then the rows
-  local line = panel:CreateTexture(nil, "ARTWORK")
-  line:SetTexture(0.7, 0.5, 0.3, 0.5)
-  line:SetHeight(1)
-  line:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -90)
-  line:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, -90)
-
-  for i = 1, table.getn(ROWS) do
-    local y = ROWS_Y - (i - 1) * ROW_H
+  for i = 1, table.getn(BC.ROWS) do
+    local def = BC.ROWS[i]
     local r = {}
     r.label = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.label:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y - 2)
-    r.label:SetText(GREY .. ROWS[i].label .. END)
-    r.value = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    r.value:SetPoint("TOPRIGHT", panel, "TOPLEFT", VALUE_X, y)
-    r.value:SetJustifyH("RIGHT")
-    r.note = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.note:SetPoint("TOPLEFT", panel, "TOPLEFT", NOTE_X, y - 2)
-    r.note:SetWidth(WIDTH - NOTE_X - 10)
-    r.note:SetJustifyH("LEFT")
-    rows[ROWS[i].key] = r
+    r.label:SetText(GREY .. def.label .. END)
+    if def.kind == "num" then
+      r.value = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      r.value:SetJustifyH("RIGHT")
+      r.note = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      r.note:SetWidth(NOTE_W)
+      r.note:SetJustifyH("LEFT")
+    else
+      r.value = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      r.value:SetWidth(WIDTH - COLS[1] - 36 - 12)
+      r.value:SetHeight(WIDE_H - 2)
+      r.value:SetJustifyH("LEFT")
+      r.value:SetJustifyV("TOP")
+      r.note = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    end
+    rows[def.key] = r
   end
 
   if not BC.char.shown then panel:Hide() end
+  BC.Layout()
 end
 
 function BC.InitPanel()
@@ -183,11 +287,11 @@ function BC.TogglePanel()
 end
 
 ------------------------------------------------------------------------------------------------------
--- The edit window: type the numbers you already have
+-- The edit window: the numbers you already have, and which rows to show
 ------------------------------------------------------------------------------------------------------
 
 local edit
-local boxes = {}
+local boxes, checks = {}, {}
 local filled = {}        -- what each box was filled with, so an untouched box changes nothing
 local FIELDS = {
   { key = "kills", label = "Boars killed", tip = "Every boar this character has ever killed." },
@@ -219,6 +323,7 @@ local function Fill()
   filled.kills, filled.deaths, filled.played = tostring(c.kills), tostring(c.deaths), BC.Time(c.played)
   filled.boarXP, filled.otherXP = tostring(c.boarXP), tostring(c.otherXP)
   for key, text in pairs(filled) do boxes[key]:SetText(text) end
+  for key, check in pairs(checks) do check:SetChecked(c.show[key] and 1 or nil) end
 end
 
 local function Changed(key)
@@ -259,9 +364,9 @@ local resetClicks = 0
 
 local function BuildEdit()
   edit = CreateFrame("Frame", "BoarChallengePlusEdit", UIParent)
-  edit:SetWidth(340)
-  edit:SetHeight(290)
-  edit:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+  edit:SetWidth(380)
+  edit:SetHeight(468)
+  edit:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
   edit:SetFrameStrata("DIALOG")
   edit:SetClampedToScreen(true)
   edit:EnableMouse(true)
@@ -284,26 +389,48 @@ local function BuildEdit()
   title:SetText("Boar Challenge +")
   local sub = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
-  sub:SetText(GREY .. "Change the numbers for " .. (UnitName("player") or "this character") .. END)
+  sub:SetText(GREY .. "The numbers for " .. (UnitName("player") or "this character") .. ", and what the panel shows" .. END)
 
   local close = CreateFrame("Button", "BoarChallengePlusEditClose", edit, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", edit, "TOPRIGHT", -6, -6)
 
   for i = 1, table.getn(FIELDS) do
     local f = FIELDS[i]
-    local y = -66 - (i - 1) * 30
+    local y = -62 - (i - 1) * 28
     local label = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     label:SetPoint("TOPLEFT", edit, "TOPLEFT", 28, y - 4)
     label:SetText(f.label)
     local box = CreateFrame("EditBox", "BoarChallengePlusEdit" .. f.key, edit, "InputBoxTemplate")
     box:SetWidth(120)
     box:SetHeight(20)
-    box:SetPoint("TOPLEFT", edit, "TOPLEFT", 180, y)
+    box:SetPoint("TOPLEFT", edit, "TOPLEFT", 200, y)
     box:SetAutoFocus(false)
     box:SetScript("OnEscapePressed", function() this:ClearFocus() end)
     box:SetScript("OnEnterPressed", function() Save() end)
     Explain(box, f.label, f.tip)
     boxes[f.key] = box
+  end
+
+  -- Which rows the panel shows: one checkbox each, two columns, working at once.
+  local head = edit:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+  head:SetPoint("TOPLEFT", edit, "TOPLEFT", 28, -210)
+  head:SetText("Rows on the panel")
+  for i = 1, table.getn(BC.ROWS) do
+    local def = BC.ROWS[i]
+    local col = math.mod(i - 1, 2)
+    local row = math.floor((i - 1) / 2)
+    local check = CreateFrame("CheckButton", "BoarChallengePlusShow" .. def.key, edit, "UICheckButtonTemplate")
+    check:SetWidth(22)
+    check:SetHeight(22)
+    check:SetPoint("TOPLEFT", edit, "TOPLEFT", 26 + col * 170, -228 - row * 22)
+    getglobal(check:GetName() .. "Text"):SetText(def.label)
+    check.key = def.key
+    check:SetScript("OnClick", function()
+      BC.char.show[this.key] = this:GetChecked() and true or false
+      BC.Layout()
+    end)
+    Explain(check, def.label, def.tip)
+    checks[def.key] = check
   end
 
   local save = CreateFrame("Button", "BoarChallengePlusEditSave", edit, "UIPanelButtonTemplate")
@@ -312,12 +439,13 @@ local function BuildEdit()
   save:SetPoint("BOTTOMRIGHT", edit, "BOTTOMRIGHT", -24, 20)
   save:SetText("Save")
   save:SetScript("OnClick", Save)
+  Explain(save, "Save", "Keeps the numbers you typed. The row checkboxes work as soon as you click them.")
 
   local cancel = CreateFrame("Button", "BoarChallengePlusEditCancel", edit, "UIPanelButtonTemplate")
   cancel:SetWidth(80)
   cancel:SetHeight(22)
   cancel:SetPoint("RIGHT", save, "LEFT", -6, 0)
-  cancel:SetText("Cancel")
+  cancel:SetText("Close")
   cancel:SetScript("OnClick", function() edit:Hide() end)
 
   local session = CreateFrame("Button", "BoarChallengePlusEditSession", edit, "UIPanelButtonTemplate")
@@ -337,6 +465,7 @@ local function BuildEdit()
     if GetTime() - resetClicks < 10 then
       BC.ResetAll()
       Fill()
+      BC.Layout()
       this:SetText("Reset all")
     else
       resetClicks = GetTime()
