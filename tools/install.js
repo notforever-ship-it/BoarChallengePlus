@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-const ADDON = "BoarTally";
+const ADDON = "BoarChallengePlus";
 const target = path.resolve(process.argv[2] || "E:\\Ravencraft\\twmoa_1181\\Interface\\AddOns");
 
 if (!fs.existsSync(target)) {

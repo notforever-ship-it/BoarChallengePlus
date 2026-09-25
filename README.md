@@ -1,4 +1,4 @@
-# Boar Tally
+# Boar Challenge +
 
 For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Ravencraft, OctoWoW). A
 small panel on screen with everything about the run, and every number can be changed.
@@ -8,7 +8,7 @@ Type `/boar` to show or hide the panel.
 ## The panel
 
 ```
-Boar Tally  Stealthboar
+Boar Challenge +  Stealthboar
 Boars 1,024  (37 this session)
 Level 17 43%  2,400 / 5,600 XP
 XP per hour 2,150  (last 30 min 2,400)
@@ -56,5 +56,5 @@ still on the account, chat says once what it counted and the command to take it 
 
 ## Installing
 
-Copy the `BoarTally` folder into `Interface\AddOns\`, or run `node tools/install.js` from this
+Copy the `BoarChallengePlus` folder into `Interface\AddOns\`, or run `node tools/install.js` from this
 folder. `node tools/check-lua.js .` checks the code against Lua 5.0 and the 1.12 API.

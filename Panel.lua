@@ -1,6 +1,6 @@
--- Boar Tally: the panel on screen, and the window for changing the numbers.
+-- Boar Challenge +: the panel on screen, and the window for changing the numbers.
 
-local BC = BoarTally
+local BC = BoarChallengePlus
 local GOLD, GREY, WHITE, RED, GREEN, END = BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END
 
 local WIDTH, HEIGHT = 250, 152
@@ -37,7 +37,7 @@ function BC.Refresh()
 end
 
 local function Build()
-  panel = CreateFrame("Frame", "BoarTallyPanel", UIParent)
+  panel = CreateFrame("Frame", "BoarChallengePlusPanel", UIParent)
   panel:SetWidth(WIDTH)
   panel:SetHeight(HEIGHT)
   panel:SetFrameStrata("MEDIUM")
@@ -73,7 +73,7 @@ local function Build()
   end)
   panel:SetScript("OnEnter", function()
     GameTooltip:SetOwner(this, "ANCHOR_LEFT")
-    GameTooltip:SetText("Boar Tally")
+    GameTooltip:SetText("Boar Challenge +")
     GameTooltip:AddLine("Right-click to change the numbers. Shift-drag to move. /boar hides it.", 0.8, 0.8, 0.8, 1)
     GameTooltip:AddLine("XP per hour and boars per hour count this session; the last 30 minutes are in brackets.", 0.8, 0.8, 0.8, 1)
     GameTooltip:Show()
@@ -88,7 +88,7 @@ local function Build()
 
   local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -8)
-  title:SetText(GOLD .. "Boar Tally" .. END .. GREY .. "  " .. (UnitName("player") or "") .. END)
+  title:SetText(GOLD .. "Boar Challenge +" .. END .. GREY .. "  " .. (UnitName("player") or "") .. END)
 
   text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   text:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -26)
@@ -182,7 +182,7 @@ end
 local resetClicks = 0
 
 local function BuildEdit()
-  edit = CreateFrame("Frame", "BoarTallyEdit", UIParent)
+  edit = CreateFrame("Frame", "BoarChallengePlusEdit", UIParent)
   edit:SetWidth(340)
   edit:SetHeight(290)
   edit:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
@@ -201,16 +201,16 @@ local function BuildEdit()
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
   })
   edit:Hide()
-  table.insert(UISpecialFrames, "BoarTallyEdit")
+  table.insert(UISpecialFrames, "BoarChallengePlusEdit")
 
   local title = edit:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
   title:SetPoint("TOP", edit, "TOP", 0, -18)
-  title:SetText("Boar Tally")
+  title:SetText("Boar Challenge +")
   local sub = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   sub:SetPoint("TOP", title, "BOTTOM", 0, -2)
   sub:SetText(GREY .. "Change the numbers for " .. (UnitName("player") or "this character") .. END)
 
-  local close = CreateFrame("Button", "BoarTallyEditClose", edit, "UIPanelCloseButton")
+  local close = CreateFrame("Button", "BoarChallengePlusEditClose", edit, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", edit, "TOPRIGHT", -6, -6)
 
   for i = 1, table.getn(FIELDS) do
@@ -219,7 +219,7 @@ local function BuildEdit()
     local label = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     label:SetPoint("TOPLEFT", edit, "TOPLEFT", 28, y - 4)
     label:SetText(f.label)
-    local box = CreateFrame("EditBox", "BoarTallyEdit" .. f.key, edit, "InputBoxTemplate")
+    local box = CreateFrame("EditBox", "BoarChallengePlusEdit" .. f.key, edit, "InputBoxTemplate")
     box:SetWidth(120)
     box:SetHeight(20)
     box:SetPoint("TOPLEFT", edit, "TOPLEFT", 180, y)
@@ -230,21 +230,21 @@ local function BuildEdit()
     boxes[f.key] = box
   end
 
-  local save = CreateFrame("Button", "BoarTallyEditSave", edit, "UIPanelButtonTemplate")
+  local save = CreateFrame("Button", "BoarChallengePlusEditSave", edit, "UIPanelButtonTemplate")
   save:SetWidth(100)
   save:SetHeight(22)
   save:SetPoint("BOTTOMRIGHT", edit, "BOTTOMRIGHT", -24, 20)
   save:SetText("Save")
   save:SetScript("OnClick", Save)
 
-  local cancel = CreateFrame("Button", "BoarTallyEditCancel", edit, "UIPanelButtonTemplate")
+  local cancel = CreateFrame("Button", "BoarChallengePlusEditCancel", edit, "UIPanelButtonTemplate")
   cancel:SetWidth(80)
   cancel:SetHeight(22)
   cancel:SetPoint("RIGHT", save, "LEFT", -6, 0)
   cancel:SetText("Cancel")
   cancel:SetScript("OnClick", function() edit:Hide() end)
 
-  local session = CreateFrame("Button", "BoarTallyEditSession", edit, "UIPanelButtonTemplate")
+  local session = CreateFrame("Button", "BoarChallengePlusEditSession", edit, "UIPanelButtonTemplate")
   session:SetWidth(110)
   session:SetHeight(22)
   session:SetPoint("BOTTOMLEFT", edit, "BOTTOMLEFT", 24, 20)
@@ -252,7 +252,7 @@ local function BuildEdit()
   session:SetScript("OnClick", function() BC.ResetSession() end)
   Explain(session, "New session", "Starts the session counters (this session's boars, XP per hour) again. The totals stay.")
 
-  local reset = CreateFrame("Button", "BoarTallyEditReset", edit, "UIPanelButtonTemplate")
+  local reset = CreateFrame("Button", "BoarChallengePlusEditReset", edit, "UIPanelButtonTemplate")
   reset:SetWidth(110)
   reset:SetHeight(22)
   reset:SetPoint("BOTTOMLEFT", edit, "BOTTOMLEFT", 24, 46)
