@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.2.1"
+BC.VERSION = "1.2.2"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -18,7 +18,7 @@ local NAME_WORDS = { "boar", "goretusk", "agam'ar" }   -- boars whose names say 
 local WINDOW = 1800                                    -- seconds: the "last 30 min" rate
 local DOUBLE = 1.5                                     -- seconds: the same death seen twice is one kill
 
-local DEFAULTS = { locked = true, shown = true }
+local DEFAULTS = { locked = true }
 
 BC.session = { startedAt = 0, kills = 0, xp = 0, boarXP = 0, played = 0, deaths = 0 }
 local recent = {}        -- { at, xp, kill }: the last hour, for the "last 30 min" rate
@@ -76,6 +76,7 @@ local function InitDB()
   if type(c.otherXP) ~= "number" then c.otherXP = 0 end
   if type(c.deaths) ~= "number" then c.deaths = 0 end
   if type(c.played) ~= "number" then c.played = 0 end
+  if c.shown == nil then c.shown = true end            -- the panel on or off, for this character only
   if type(c.byName) ~= "table" then c.byName = {} end
   if type(c.byLevel) ~= "table" then c.byLevel = {} end
   if type(c.levels) ~= "table" then c.levels = {} end

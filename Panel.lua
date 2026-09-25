@@ -162,7 +162,7 @@ local function Build()
     rows[ROWS[i].key] = r
   end
 
-  if not BC.db.shown then panel:Hide() end
+  if not BC.char.shown then panel:Hide() end
 end
 
 function BC.InitPanel()
@@ -174,10 +174,10 @@ function BC.TogglePanel()
   if not panel then Build() end
   if panel:IsShown() then
     panel:Hide()
-    BC.db.shown = false
+    BC.char.shown = false
   else
     panel:Show()
-    BC.db.shown = true
+    BC.char.shown = true
     Draw()
   end
 end

@@ -3,7 +3,8 @@
 For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Ravencraft, OctoWoW). A
 small panel on screen with everything about the run, and every number can be changed.
 
-Type `/boar` to show or hide the panel.
+Type `/boar` to show or hide the panel. That is remembered per character, so it can be on for your boar
+character and off for the rest.
 
 ## The panel
 
@@ -43,7 +44,7 @@ still on the account, chat says once what it counted and the command to take it 
 
 | Command | What it does |
 |---|---|
-| `/boar` | Show or hide the panel |
+| `/boar` | Show or hide the panel, remembered for this character only |
 | `/boar edit` | Change the numbers in a window |
 | `/boar set kills 1000` | Set one number: `kills`, `deaths`, `played`, `xp` (from boars), `otherxp` |
 | `/boar add <name>` | Count this creature as a boar (no name: your target) |
