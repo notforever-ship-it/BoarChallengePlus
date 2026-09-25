@@ -9,7 +9,7 @@
 
 BoarChallenge = {}
 local BC = BoarChallenge
-BC.VERSION = "1.0.0"
+BC.VERSION = "1.0.1"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -83,13 +83,21 @@ local function InitDB()
   if type(c.extra) ~= "table" then c.extra = {} end        -- names you added with /boar add
   if not c.startedAt then c.startedAt = time() end
   if not c.startLevel then c.startLevel = UnitLevel("player") end
-  -- The old Boaring Challenge addon kept one number, the kills, for the whole account. Taken over
-  -- once, when this character has nothing counted yet and the old addon's data is still around.
-  if c.kills == 0 and not c.imported and type(BoaringChallengeDB) == "table" and type(BoaringChallengeDB.totalKills) == "number" then
-    c.kills = math.floor(BoaringChallengeDB.totalKills)
-    c.imported = c.kills
-  end
   BC.char = c
+end
+
+-- The old Boaring Challenge addon kept one number, the kills, for the whole account, so it can't say
+-- which character they belong to. Every character starts at zero here; when the old data is still
+-- around, chat says once what it counted and how to take it over, and you decide.
+local function OldAddonHint()
+  local c = BC.char
+  if c.kills > 0 or c.oldHintShown then return end
+  if type(BoaringChallengeDB) ~= "table" or type(BoaringChallengeDB.totalKills) ~= "number" then return end
+  c.oldHintShown = true
+  local n = math.floor(BoaringChallengeDB.totalKills)
+  local level = tonumber(BoaringChallengeDB.characterLevel)
+  BC.Print("the old Boaring Challenge counted " .. BC.Num(n) .. " boars" .. (level and (" on a level " .. level .. " character") or "") ..
+    ". If that was this character, type " .. GOLD .. "/boar set kills " .. n .. END .. ". Anyone else starts at 0.")
 end
 
 ------------------------------------------------------------------------------------------------------
@@ -391,10 +399,13 @@ events:SetScript("OnEvent", function()
     if BC.InitPanel then BC.InitPanel() end
     BC.Print("v" .. BC.VERSION .. " counting for " .. GOLD .. (UnitName("player") or "you") .. END .. ": " ..
       BC.Num(BC.char.kills) .. " boars so far. " .. GOLD .. "/boar" .. END .. " for the panel, " .. GOLD .. "/boar help" .. END .. " for commands.")
-    if BC.char.imported and not BC.char.importedSaid then
-      BC.char.importedSaid = true
-      BC.Print("took over " .. BC.Num(BC.char.imported) .. " boars from the old Boaring Challenge. Wrong? Right-click the panel and type the right number.")
+    -- Stealthboar had 993 boars on the old addon before this one existed. Everyone else starts at 0.
+    if BC.char.kills == 0 and not BC.char.seeded and UnitName("player") == "Stealthboar" then
+      BC.char.seeded = true
+      BC.char.kills = 993
+      BC.Print("starting from the 993 boars counted before this addon. Right-click the panel if that is off.")
     end
+    OldAddonHint()
   elseif not BC.char then
     return
   elseif event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" then

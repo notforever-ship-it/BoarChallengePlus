@@ -34,8 +34,10 @@ Deaths 2  98% of your XP is boar
 Right-click the panel, or `/boar edit`: boars killed, deaths, time played (like `14h30m`), XP from
 boars, XP from other things. Or from chat: `/boar set kills 1000`, `/boar set played 14h30m`.
 
-If the old Boaring Challenge addon's data is still on the account, its kill count is taken over the
-first time this runs on a character with nothing counted yet.
+Every character starts at 0, yours and anyone else's, except Stealthboar, who had 993 boars before
+this addon existed and starts there. If the old Boaring Challenge addon's data is
+still on the account, chat says once what it counted and the command to take it over
+(`/boar set kills 993`), so the number only lands on the character you choose.
 
 ## Commands
 
