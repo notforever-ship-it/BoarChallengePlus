@@ -1,10 +1,10 @@
 ## Interface: 11200
-## Title: Boar Challenge
+## Title: Boar Tally
 ## Notes: For a character that levels on boars alone: boars killed, XP and boars per hour, time to the next level, time played. /boar
 ## Author: stealthzi
-## Version: 1.0.2
-## SavedVariables: BoarChallengeDB
-## SavedVariablesPerCharacter: BoarChallengeCharDB
+## Version: 1.1.0
+## SavedVariables: BoarTallyDB
+## SavedVariablesPerCharacter: BoarTallyCharDB
 
 Core.lua
 Panel.lua

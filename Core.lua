@@ -1,4 +1,4 @@
--- Boar Challenge: for a character that levels on boars alone. Counts every boar you kill and the XP
+-- Boar Tally: for a character that levels on boars alone. Counts every boar you kill and the XP
 -- you get, keeps your time, and works out XP and boars per hour and how long the next level will take.
 -- Everything is saved per character; every number can be changed with /boar set or the edit window.
 --
@@ -7,9 +7,9 @@
 -- target it (remembered by name from then on), anything with boar or goretusk in its name, and any
 -- name you add with /boar add.
 
-BoarChallenge = {}
-local BC = BoarChallenge
-BC.VERSION = "1.0.2"
+BoarTally = {}
+local BC = BoarTally
+BC.VERSION = "1.1.0"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -25,7 +25,7 @@ local recent = {}        -- { at, xp, kill }: the last hour, for the "last 30 mi
 local lastKill = {}      -- [name] = GetTime() of the last counted kill
 
 function BC.Print(msg)
-  if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cffd9a066Boar Challenge:|r " .. msg) end
+  if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cffd9a066Boar Tally:|r " .. msg) end
 end
 
 function BC.Trim(s)
@@ -63,14 +63,14 @@ end
 ------------------------------------------------------------------------------------------------------
 
 local function InitDB()
-  if type(BoarChallengeDB) ~= "table" then BoarChallengeDB = {} end
+  if type(BoarTallyDB) ~= "table" then BoarTallyDB = {} end
   for k, v in pairs(DEFAULTS) do
-    if BoarChallengeDB[k] == nil then BoarChallengeDB[k] = v end
+    if BoarTallyDB[k] == nil then BoarTallyDB[k] = v end
   end
-  BC.db = BoarChallengeDB
+  BC.db = BoarTallyDB
 
-  if type(BoarChallengeCharDB) ~= "table" then BoarChallengeCharDB = {} end
-  local c = BoarChallengeCharDB
+  if type(BoarTallyCharDB) ~= "table" then BoarTallyCharDB = {} end
+  local c = BoarTallyCharDB
   if type(c.kills) ~= "number" then c.kills = 0 end
   if type(c.boarXP) ~= "number" then c.boarXP = 0 end
   if type(c.otherXP) ~= "number" then c.otherXP = 0 end
@@ -275,7 +275,7 @@ function BC.ResetSession()
 end
 
 function BC.ResetAll()
-  BoarChallengeCharDB = {}
+  BoarTallyCharDB = {}
   InitDB()
   BC.ResetSession()
   BC.Print(RED .. "everything for this character is back to zero." .. END)
@@ -373,9 +373,9 @@ local function Slash(msg)
   end
 end
 
-SLASH_BOARCHALLENGE1 = "/boar"
-SLASH_BOARCHALLENGE2 = "/boarchallenge"
-SlashCmdList["BOARCHALLENGE"] = Slash
+SLASH_BOARTALLY1 = "/boar"
+SLASH_BOARTALLY2 = "/boartally"
+SlashCmdList["BOARTALLY"] = Slash
 
 ------------------------------------------------------------------------------------------------------
 -- Events
