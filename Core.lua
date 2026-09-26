@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.4.0"
+BC.VERSION = "1.4.1"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -76,6 +76,11 @@ local function InitDB()
   if type(c.otherXP) ~= "number" then c.otherXP = 0 end
   if type(c.deaths) ~= "number" then c.deaths = 0 end
   if type(c.played) ~= "number" then c.played = 0 end
+  if type(c.xpKills) ~= "number" then
+    -- boars whose XP the addon saw: everything but the 1000 Stealthboar started with
+    c.xpKills = c.kills - (c.seeded and 1000 or 0)
+    if c.xpKills < 0 then c.xpKills = 0 end
+  end
   if c.shown == nil then c.shown = true end            -- the panel on or off, for this character only
   if type(c.show) ~= "table" then c.show = {} end
   if c.showVersion ~= 2 then
@@ -179,8 +184,13 @@ local function GainXP(amount, from, bonus)
   local c = BC.char
   if from and BC.IsBoar(from) then
     c.boarXP = c.boarXP + amount
+    c.xpKills = (c.xpKills or 0) + 1
     BC.session.boarXP = BC.session.boarXP + amount
     BC.session.boarBase = BC.session.boarBase + amount - (bonus or 0)
+    -- the last boar, kept for the next login: what it gave without rested, at what level, and its own level
+    local mob = (UnitName("target") == from) and UnitLevel("target") or nil
+    if mob and mob < 1 then mob = nil end
+    c.lastBoar = { xp = amount, base = amount - (bonus or 0), level = UnitLevel("player"), mob = mob, at = time() }
   else
     c.otherXP = c.otherXP + amount
   end
@@ -232,17 +242,45 @@ function BC.Stats()
   st.xpHour = (hours > 0.0167) and (s.xp / hours) or 0
   st.killsHour = (hours > 0.0167) and (s.kills / hours) or 0
   st.xpHourRecent, st.killsHourRecent = WindowRates()
-  -- XP per boar: this session's boars, else what the character has seen over all time
-  if s.kills > 0 then
-    st.xpPerBoar = s.boarXP / s.kills
-  elseif c.kills > 0 then
-    st.xpPerBoar = c.boarXP / c.kills
+  -- What a boar gives without the rested bonus: this session's boars; before the first kill of a
+  -- session, the last boar you killed (scaled if you have levelled since); failing that, all time.
+  local plain
+  if s.kills > 0 and s.boarBase > 0 then
+    plain = s.boarBase / s.kills
+  elseif c.lastBoar and c.lastBoar.base and c.lastBoar.base > 0 then
+    plain = c.lastBoar.base
+    if c.lastBoar.level and c.lastBoar.level ~= st.level and BC.KillXP then
+      local mob = c.lastBoar.mob or c.lastBoar.level
+      local was, now = BC.KillXP(c.lastBoar.level, mob), BC.KillXP(st.level, mob)
+      if was > 0 then plain = plain * now / was end
+    end
+  elseif (c.xpKills or 0) > 0 then
+    plain = c.boarXP / c.xpKills
   else
-    st.xpPerBoar = 0
+    plain = 0
   end
+  st.rested = (GetXPExhaustion and GetXPExhaustion()) or 0
+  st.xpPerBoarBase = plain
+  -- while rested XP lasts a boar gives double, and the pool goes down by the plain amount
+  st.xpPerBoar = (st.rested >= plain) and plain * 2 or plain
   local left = st.xpMax - st.xp
-  st.boarsToLevel = (st.xpPerBoar > 0) and math.ceil(left / st.xpPerBoar) or nil
+  if plain > 0 then
+    if 2 * st.rested >= left then
+      st.boarsToLevel = math.ceil(left / (2 * plain))
+    else
+      st.boarsToLevel = math.ceil((left - st.rested) / plain)
+    end
+    if st.boarsToLevel < 0 then st.boarsToLevel = 0 end
+  else
+    st.boarsToLevel = nil
+  end
+  -- the pace: the last 30 minutes, else this session, else the pace you left with last time
   local rate = (s.played >= 300 and st.xpHourRecent > 0) and st.xpHourRecent or st.xpHour
+  if rate > 0 and s.played >= 600 then c.lastRate = rate end
+  if rate <= 0 and c.lastRate then
+    rate = c.lastRate
+    st.paceFromLast = true
+  end
   st.secondsToLevel = (rate > 0) and (left / rate * 3600) or nil
   local total = c.boarXP + c.otherXP
   st.boarShare = (total > 0) and math.floor(c.boarXP / total * 100 + 0.5) or nil
@@ -256,9 +294,6 @@ function BC.Stats()
     st.lastLevelTime = last.played - (prev and prev.played or 0)
     st.lastLevelFull = (prev ~= nil)
   end
-  st.rested = (GetXPExhaustion and GetXPExhaustion()) or 0
-  -- rested gives each boar its XP again until the pool runs out, so the pool lasts pool / plain XP boars
-  local plain = (s.kills > 0 and s.boarBase > 0) and (s.boarBase / s.kills) or st.xpPerBoar
   st.restedBoars = (plain > 0 and st.rested > 0) and math.floor(st.rested / plain) or nil
   st.sessionXP = s.xp
   if s.played >= 600 and st.xpHour > (c.bestXPHour or 0) then c.bestXPHour = st.xpHour end

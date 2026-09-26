@@ -86,9 +86,14 @@ those are kept in the zone they are really in.
   dies." while X is your target (your pet got the blow).
 - A **boar** is anything the game calls a Boar when you target it (remembered by name from then on),
   anything with boar, goretusk or agam'ar in its name, and any name you add with `/boar add`.
+- **Boars to level** starts from what a boar gives you without the rested bonus (read from the combat
+  log): this session's boars, or before the first kill of a session the last boar you killed, which
+  is remembered between logins and scaled if you have levelled since. Then it counts your rested XP:
+  those boars give double. So it is right the moment you log in.
 - **XP per hour** and **boars per hour** count this session. **Time to level** uses the last 30
-  minutes once you have played 5 minutes, else the session.
-- **Boars on rested** uses the XP a boar gives without the rested bonus, read from the combat log.
+  minutes once you have played 5 minutes, else the session, and before that the pace you left with
+  last time.
+- **Boars on rested** is the rested pool over what a boar gives without the bonus.
 - **Played** counts while you are logged in and not AFK.
 - Level-ups are written down with the boars and time they took: `/boar levels` lists them.
 
