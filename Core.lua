@@ -1,4 +1,4 @@
-﻿-- Boar Challenge +: for a character that levels on boars alone. Counts every boar you kill and the XP
+-- Boar Challenge +: for a character that levels on boars alone. Counts every boar you kill and the XP
 -- you get, keeps your time, and works out XP and boars per hour and how long the next level will take.
 -- Everything is saved per character; every number can be changed with /boar set or the edit window.
 --
