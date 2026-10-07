@@ -467,11 +467,30 @@ function BC.TogglePanel()
 end
 
 function BC.SetScale(s)
+  s = tonumber(s) or 1
   if s < 0.6 then s = 0.6 end
   if s > 2 then s = 2 end
   s = math.floor(s * 20 + 0.5) / 20
   BC.db.scale = s
-  if panel then panel:SetScale(s) end
+  if panel then
+    panel:SetScale(s)
+    -- A report: after the size buttons the whole panel went blank until /reload. The 1.12 client can lose what a
+    -- frame draws when its scale changes, so put it back the way it is built at login: anchor it again, lay
+    -- everything out again, and hide and show it so it is drawn from scratch.
+    local pos = BC.db.pos
+    panel:ClearAllPoints()
+    if type(pos) == "table" and pos.point then
+      panel:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x or 0, pos.y or 0)
+    else
+      panel:SetPoint("TOP", UIParent, "TOP", 0, -30)
+    end
+    BC.Layout()
+    if panel:IsShown() then
+      panel:Hide()
+      panel:Show()
+    end
+    elapsed = 1
+  end
   if BC.FillEdit then BC.FillEdit() end
 end
 

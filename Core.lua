@@ -1,4 +1,4 @@
--- Boar Challenge +: for a character that levels on boars alone. Counts every boar you kill and the XP
+﻿-- Boar Challenge +: for a character that levels on boars alone. Counts every boar you kill and the XP
 -- you get, keeps your time, and works out XP and boars per hour and how long the next level will take.
 -- Everything is saved per character; every number can be changed with /boar set or the edit window.
 --
@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.4.1"
+BC.VERSION = "1.4.2"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
