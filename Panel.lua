@@ -19,40 +19,40 @@ local DASH = "-"
 
 -- Everything the panel can show, in the order it shows it: group, key, label, on at first, what it is.
 BC.ITEMS = {
-  { g = "top", key = "title", label = "Title", on = true, tip = "Boar Challenge + at the top left." },
-  { g = "top", key = "name", label = "Character name", on = true, tip = "Your character's name at the top right." },
-  { g = "top", key = "head", label = "Boars to level", on = true, tip = "The big line: how many boars to the next level. Counts the rested XP you have: those boars give double." },
-  { g = "top", key = "bigKills", label = "Boars killed (big)", on = true, tip = "Every boar this character has killed, big, at the right of the headline." },
-  { g = "top", key = "bar", label = "XP bar", on = true, tip = "Your XP to the next level as a bar." },
-  { g = "top", key = "barText", label = "Numbers on the bar", on = true, tip = "Level, XP and percent on the XP bar." },
-  { g = "top", key = "barRested", label = "Rested on the bar", on = true, tip = "Rested XP as a blue stretch past your XP, like the game's own bar, and the amount on the bar." },
-  { g = "top", key = "bg", label = "Background", on = true, tip = "The dark background and border. Off leaves the text on its own." },
+  { g = "top", key = "title", label = "Title", on = true, tip = "The addon name, top left." },
+  { g = "top", key = "name", label = "Character name", on = true, tip = "Your name, top right." },
+  { g = "top", key = "head", label = "Boars to level", on = true, tip = "Big line: boars to next level. Counts rested XP." },
+  { g = "top", key = "bigKills", label = "Boars killed (big)", on = true, tip = "All your boar kills, big, top right." },
+  { g = "top", key = "bar", label = "XP bar", on = true, tip = "Your XP as a bar." },
+  { g = "top", key = "barText", label = "Numbers on the bar", on = true, tip = "Level, XP and percent on the bar." },
+  { g = "top", key = "barRested", label = "Rested on the bar", on = true, tip = "Rested XP in blue on the bar." },
+  { g = "top", key = "bg", label = "Background", on = true, tip = "Dark background and border." },
 
-  { g = "advice", key = "here", label = "Here", on = true, tip = "The boars in the zone you are in, biggest first, coloured the way the game colours them for you. Grey gives no XP." },
-  { g = "advice", key = "now", label = "Now", on = true, tip = "Stay here until a level, or go somewhere better, and about how many boars that is. A zone with boars as good is named too." },
-  { g = "advice", key = "next", label = "Next", on = true, tip = "Where to go after that, and at what level." },
-  { g = "advice", key = "later", label = "Later", on = false, tip = "The stops after that. Hover the panel, or type /boar route, for the whole road." },
+  { g = "advice", key = "here", label = "Here", on = true, tip = "Boars in this zone, biggest first. Grey gives no XP." },
+  { g = "advice", key = "now", label = "Now", on = true, tip = "Stay here until a level, or go somewhere better." },
+  { g = "advice", key = "next", label = "Next", on = true, tip = "Where to go after that, and when." },
+  { g = "advice", key = "later", label = "Later", on = false, tip = "The stops after that. Full road: /boar route." },
 
   -- the numbers, in colour groups: boars orange, XP purple, time blue, rested green, deaths red
-  { g = "num", c = "boars", key = "kills", label = "Boars killed", on = false, tip = "Every boar this character has killed. It is also big in the headline." },
+  { g = "num", c = "boars", key = "kills", label = "Boars killed", on = false, tip = "All your boar kills." },
   { g = "num", c = "boars", key = "bph", label = "Boars per hour", on = true, tip = "This session's boars per hour." },
-  { g = "num", c = "boars", key = "sessionKills", label = "Boars this session", on = true, tip = "Boars since you logged in, or since New session." },
-  { g = "num", c = "boars", key = "thisLevel", label = "Boars this level", on = false, tip = "Boars killed since you reached this level." },
-  { g = "num", c = "boars", key = "bphRecent", label = "Boars/h last 30 min", on = false, tip = "Boars per hour over the last 30 minutes only." },
-  { g = "num", c = "boars", key = "lastBoars", label = "Boars last level", on = false, tip = "Boars the last level took. Shows after two level-ups with the addon." },
+  { g = "num", c = "boars", key = "sessionKills", label = "Boars this session", on = true, tip = "Boars since login or New session." },
+  { g = "num", c = "boars", key = "thisLevel", label = "Boars this level", on = false, tip = "Boars since you reached this level." },
+  { g = "num", c = "boars", key = "bphRecent", label = "Boars/h last 30 min", on = false, tip = "Boars per hour, last 30 minutes." },
+  { g = "num", c = "boars", key = "lastBoars", label = "Boars last level", on = false, tip = "Boars the last level took. Shows after 2 level-ups." },
   { g = "num", c = "xp", key = "xph", label = "XP per hour", on = true, tip = "This session's XP per hour." },
-  { g = "num", c = "xp", key = "xpb", label = "XP per boar", on = true, tip = "What the next boar gives: this session's average, doubled while rested XP lasts. Before the first kill of a session it is the last boar you killed." },
-  { g = "num", c = "xp", key = "xphRecent", label = "XP/h last 30 min", on = false, tip = "XP per hour over the last 30 minutes only." },
-  { g = "num", c = "xp", key = "xpLeft", label = "XP to level", on = false, tip = "XP still needed for the next level." },
-  { g = "num", c = "xp", key = "sessionXP", label = "XP this session", on = false, tip = "All XP gained this session." },
-  { g = "num", c = "xp", key = "best", label = "Best XP per hour", on = false, tip = "Your best session rate, counted after 10 minutes of a session." },
-  { g = "num", c = "xp", key = "boarShare", label = "XP from boars", on = false, tip = "How much of all your XP came from boars." },
-  { g = "num", c = "time", key = "pace", label = "Time to level", on = true, tip = "How long the next level takes at your pace: the last 30 minutes, or the pace you left with last time until then." },
-  { g = "num", c = "time", key = "played", label = "Time played", on = true, tip = "Time on the challenge. It stops while you are AFK." },
+  { g = "num", c = "xp", key = "xpb", label = "XP per boar", on = true, tip = "What the next boar gives. Double while rested." },
+  { g = "num", c = "xp", key = "xphRecent", label = "XP/h last 30 min", on = false, tip = "XP per hour, last 30 minutes." },
+  { g = "num", c = "xp", key = "xpLeft", label = "XP to level", on = false, tip = "XP left to the next level." },
+  { g = "num", c = "xp", key = "sessionXP", label = "XP this session", on = false, tip = "XP gained this session." },
+  { g = "num", c = "xp", key = "best", label = "Best XP per hour", on = false, tip = "Your best session rate (after 10 minutes)." },
+  { g = "num", c = "xp", key = "boarShare", label = "XP from boars", on = false, tip = "Share of your XP from boars." },
+  { g = "num", c = "time", key = "pace", label = "Time to level", on = true, tip = "Time to next level at your recent pace." },
+  { g = "num", c = "time", key = "played", label = "Time played", on = true, tip = "Time on the challenge. Stops while AFK." },
   { g = "num", c = "time", key = "sessionPlayed", label = "Played this session", on = false, tip = "Time played this session." },
-  { g = "num", c = "time", key = "lastTime", label = "Time last level", on = false, tip = "Time the last level took. Shows after two level-ups with the addon." },
-  { g = "num", c = "rested", key = "rested", label = "Rested XP", on = false, tip = "Rested XP left. Boars give double until it runs out." },
-  { g = "num", c = "rested", key = "restedBoars", label = "Boars on rested", on = false, tip = "About how many more boars get double XP from rested." },
+  { g = "num", c = "time", key = "lastTime", label = "Time last level", on = false, tip = "Time the last level took. Shows after 2 level-ups." },
+  { g = "num", c = "rested", key = "rested", label = "Rested XP", on = false, tip = "Rested XP left. Boars give double." },
+  { g = "num", c = "rested", key = "restedBoars", label = "Boars on rested", on = false, tip = "Boars left on double XP." },
   { g = "num", c = "deaths", key = "deaths", label = "Deaths", on = false, tip = "How many times this character has died." },
 }
 
@@ -338,8 +338,9 @@ local function ShowTooltip()
     end
     GameTooltip:AddLine(" ")
   end
-  GameTooltip:AddLine("Right-click: your numbers, and what the panel shows.", 0.8, 0.8, 0.8)
-  GameTooltip:AddLine("Shift-drag to move. /boar route gives map positions.", 0.8, 0.8, 0.8)
+  GameTooltip:AddLine("Right-click: settings", 0.8, 0.8, 0.8)
+  GameTooltip:AddLine("Shift-drag: move", 0.8, 0.8, 0.8)
+  GameTooltip:AddLine("/boar route: map positions", 0.8, 0.8, 0.8)
   GameTooltip:Show()
 end
 
@@ -502,11 +503,11 @@ local edit, sizeText, lockCheck
 local boxes, checks = {}, {}
 local filled = {}        -- what each box was filled with, so an untouched box changes nothing
 local FIELDS = {
-  { key = "kills", label = "Boars killed", tip = "Every boar this character has ever killed." },
+  { key = "kills", label = "Boars killed", tip = "All your boar kills." },
   { key = "deaths", label = "Deaths", tip = "How many times this character has died." },
-  { key = "played", label = "Time played", tip = "Time on the challenge, like 14h30m or 90m. Counts while you are logged in and not AFK." },
-  { key = "boarXP", label = "XP from boars", tip = "All the experience boars have given, for the boar share and XP per boar." },
-  { key = "otherXP", label = "XP from other things", tip = "Experience from quests, exploring and anything that isn't a boar." },
+  { key = "played", label = "Time played", tip = "Like 14h30m or 90m. Stops while AFK." },
+  { key = "boarXP", label = "XP from boars", tip = "All XP boars have given." },
+  { key = "otherXP", label = "XP from other things", tip = "XP from quests, exploring and the rest." },
 }
 
 local function Opaque(f)
@@ -640,8 +641,8 @@ local function BuildEdit()
   Heading("On the panel", 24, -166)
   local hint = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   hint:SetPoint("TOPLEFT", edit, "TOPLEFT", 120, -168)
-  hint:SetText(GREY .. "each box works as soon as you click it" .. END)
-  local defaults = Button("BoarChallengePlusEditDefaults", "Defaults", 90, "Puts the panel back to what it shows at first.")
+  hint:SetText(GREY .. "boxes work at once" .. END)
+  local defaults = Button("BoarChallengePlusEditDefaults", "Defaults", 90, "Panel back to how it starts.")
   defaults:SetPoint("TOPRIGHT", edit, "TOPRIGHT", -24, -162)
   defaults:SetScript("OnClick", function()
     for i = 1, table.getn(BC.ITEMS) do BC.char.show[BC.ITEMS[i].key] = BC.ITEMS[i].on end
@@ -685,13 +686,13 @@ local function BuildEdit()
 
   -- size and lock
   Heading("Size", 24, -452)
-  local smaller = Button("BoarChallengePlusEditSmaller", "-", 26, "Makes the panel smaller.")
+  local smaller = Button("BoarChallengePlusEditSmaller", "-", 26, "Smaller panel.")
   smaller:SetPoint("TOPLEFT", edit, "TOPLEFT", 64, -448)
   smaller:SetScript("OnClick", function() BC.SetScale((BC.db.scale or 1) - 0.1) end)
   sizeText = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
   sizeText:SetPoint("LEFT", smaller, "RIGHT", 8, 0)
   sizeText:SetWidth(70)
-  local bigger = Button("BoarChallengePlusEditBigger", "+", 26, "Makes the panel bigger.")
+  local bigger = Button("BoarChallengePlusEditBigger", "+", 26, "Bigger panel.")
   bigger:SetPoint("LEFT", sizeText, "RIGHT", 8, 0)
   bigger:SetScript("OnClick", function() BC.SetScale((BC.db.scale or 1) + 0.1) end)
   lockCheck = CreateFrame("CheckButton", "BoarChallengePlusEditLock", edit, "UICheckButtonTemplate")
@@ -700,10 +701,10 @@ local function BuildEdit()
   lockCheck:SetPoint("TOPLEFT", edit, "TOPLEFT", 290, -449)
   getglobal("BoarChallengePlusEditLockText"):SetText("Locked (Shift-drag still moves it)")
   lockCheck:SetScript("OnClick", function() BC.db.locked = this:GetChecked() and true or false end)
-  Explain(lockCheck, "Locked", "When locked, the panel only moves with Shift held down, so you can't drag it by accident.")
+  Explain(lockCheck, "Locked", "Only moves with Shift held down.")
 
   -- the buttons along the bottom
-  local reset = Button("BoarChallengePlusEditReset", "Reset all", 100, "Every number for this character back to zero. Click twice.")
+  local reset = Button("BoarChallengePlusEditReset", "Reset all", 100, "This character back to zero. Click twice.")
   reset:SetPoint("BOTTOMLEFT", edit, "BOTTOMLEFT", 24, 18)
   reset:SetScript("OnClick", function()
     if GetTime() - resetClicks < 10 then
@@ -716,10 +717,10 @@ local function BuildEdit()
       this:SetText(RED .. "Click again" .. END)
     end
   end)
-  local session = Button("BoarChallengePlusEditSession", "New session", 110, "Starts this session's counters (boars this session, XP per hour) again. The totals stay.")
+  local session = Button("BoarChallengePlusEditSession", "New session", 110, "Session counters start again. Totals stay.")
   session:SetPoint("LEFT", reset, "RIGHT", 8, 0)
   session:SetScript("OnClick", function() BC.ResetSession() end)
-  local save = Button("BoarChallengePlusEditSave", "Save", 100, "Keeps the numbers you typed. The panel boxes work as soon as you click them.")
+  local save = Button("BoarChallengePlusEditSave", "Save", 100, "Keeps the numbers you typed.")
   save:SetPoint("BOTTOMRIGHT", edit, "BOTTOMRIGHT", -24, 18)
   save:SetScript("OnClick", Save)
   local shut = Button("BoarChallengePlusEditCancel", "Close", 90)

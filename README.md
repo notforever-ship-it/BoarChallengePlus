@@ -1,11 +1,18 @@
 # Boar Challenge +
 
-For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Ravencraft, OctoWoW). A
-panel on screen with the numbers that matter for the run, every one of them optional, and a road of
-boar zones from your level to 60: stay here until level X, then go there.
+For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Ravencraft, OctoWoW).
 
-Type `/boar` to show or hide the panel. That is remembered per character, so it can be on for your
-boar character and off for the rest.
+- A panel with the numbers that matter for the run.
+- Every number can be switched off.
+- A road of boar zones from your level to 60.
+
+## Start
+
+- Type `/boar` to show or hide the panel.
+- It is remembered per character.
+- Right-click the panel for settings.
+- Hover the panel for your whole road.
+- Shift-drag to move it.
 
 ## The panel
 
@@ -21,42 +28,46 @@ Now    Stay here until level 22, about 540 boars (or Redridge Mountains)
 Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 ```
 
-- The big line is **boars to the next level** on the left and **boars killed** on the right.
-- The **XP bar** shows your rested XP as a blue stretch past your XP, like the game's own bar, and
-  the rested amount on the bar.
-- **Numbers** come in colour groups, each starting its own line: boars in orange, XP in purple, time
-  in blue, rested in green, deaths in red. Each number has its label on the left of its half of the
-  line and the number on the right, so nothing runs into anything else.
-- **Here** is the boars in the zone you stand in, biggest first, coloured the way the game colours
-  them for you. Grey gives no XP.
-- **Now** says stay here until a level, with about how many boars that is, or go somewhere better.
-  A zone with boars just as good is named too.
-- **Next** is the stop after that and the level to go at. **Later** (off at first) the ones after.
-- Hover the panel for the whole road with boar counts.
+- **Big line**: boars to next level (left), boars killed (right).
+- **XP bar**: rested XP shows in blue, with the amount.
+- **Colours**: boars orange, XP purple, time blue, rested green, deaths red.
+- **Here**: boars in this zone, biggest first. Grey gives no XP.
+- **Now**: stay here until a level, or go somewhere better.
+- **Next**: the next stop and the level to go.
+- **Later**: the stops after that (off at first).
 
-## Everything can be switched off
+## Settings
 
-Right-click the panel for the settings window. Every box works as soon as you click it:
-
-- **Top**: title, character name, boars to level, boars killed (big), XP bar, numbers on the bar,
-  rested on the bar, background.
+- Right-click the panel, or `/boar edit`.
+- Every box works as soon as you click it.
+- **Top**: title, name, boars to level, boars killed, XP bar, bar numbers, rested, background.
 - **Advice**: here, now, next, later.
-- **Numbers**: boars killed, boars per hour, boars this session, boars this level, boars per hour in
-  the last 30 minutes, boars the last level took; XP per hour, XP per boar, XP per hour in the last
-  30 minutes, XP to level, XP this session, best XP per hour, how much of your XP came from boars;
-  time to level, time played, played this session, time the last level took; rested XP, boars on
-  rested; deaths.
-- **Size**: smaller and bigger buttons (or `/boar scale 1.2`), and a lock so it only moves with Shift.
-- **Defaults** puts the panel back to how it starts.
+- **Boars**: killed, per hour, this session, this level, last 30 min, last level.
+- **XP**: per hour, per boar, last 30 min, to level, this session, best per hour, share from boars.
+- **Time**: to level, played, this session, last level.
+- **Other**: rested XP, boars on rested, deaths.
+- **Size**: smaller and bigger buttons, or `/boar scale 1.2`.
+- **Lock**: then it only moves with Shift.
+- **Defaults**: panel back to how it starts.
 
-`/boar show <thing>` switches one thing from chat; `/boar show` lists their names.
+## Your numbers
+
+- Settings window: boars killed, deaths, time played (like `14h30m`), XP from boars, other XP.
+- Only boxes you change are saved.
+- Or from chat: `/boar set kills 1000`, `/boar set played 14h30m`.
+- Every character starts at 0.
+- Stealthboar starts at 1000 (boars from before this addon).
+- Old Boaring Challenge data: chat says once what it counted, and how to take it over.
 
 ## The road
 
-The road is worked out with the game's own XP rules. For every level to 60 it asks what each zone's
-boars give you (boars 3 or 4 levels above you count half, 5 above not at all, grey ones nothing) and
-how many there are. You stay where you are until a zone with bigger boars is clearly better, so it
-never sends you across the world for the same boars. From Westfall at level 18 it comes out as:
+- Worked out with the game's own XP rules.
+- Boars 3 or 4 levels above you count half, 5 above not at all.
+- You stay put until a zone is clearly better.
+- Boar counts are estimates. Rested XP comes off the first stop.
+- Dungeon boars and the other faction's lands count for less.
+
+From Westfall at level 18:
 
 | Levels | Where | Boars | Or |
 |---|---|---|---|
@@ -67,67 +78,49 @@ never sends you across the world for the same boars. From Westfall at level 18 i
 | 46 to 58 | Blasted Lands | Ashmane Boar 48-49, Helboar 52-53 | |
 | 58 to 60 | Eastern Plaguelands | Plagued Swine 60 | |
 
-The boar counts are estimates from the XP rules; the rested XP you have now comes off the first stop.
-Dungeon boars count for less, and so do the other faction's lands. `/boar route` prints the road with
-map positions, `/boar route all` every boar known.
+## Boar data
 
-## Where the boar data comes from
-
-With **pfQuest** installed (pfQuest-turtle, pfQuest-octo), every boar's level and spawn points come
-from its database, so a server's own zones are in. Without it, a list taken from that database on
-2026-09-25 (vanilla plus Turtle WoW) is built in; OctoWoW's database shows the same boars at the
-same levels. pfQuest lists a creature on every map its spawns fall on, so the boars at the edge of
-one zone also turn up at the edge of the next (Loch Modan's Mountain Boars on the Grim Reaches map);
-those are kept in the zone they are really in.
+- With **pfQuest** (pfQuest-turtle, pfQuest-octo): boars come from its database, server zones included.
+- Without it: a built-in list from that database (2026-09-25, vanilla plus Turtle WoW).
+- OctoWoW shows the same boars at the same levels.
+- Boars on a zone's edge are kept in the zone they are really in.
 
 ## What counts
 
-- A **kill** is "You have slain X!" in the combat log, or "X dies, you gain N experience.", or "X
-  dies." while X is your target (your pet got the blow).
-- A **boar** is anything the game calls a Boar when you target it (remembered by name from then on),
-  anything with boar, goretusk or agam'ar in its name, and any name you add with `/boar add`.
-- **Boars to level** starts from what a boar gives you without the rested bonus (read from the combat
-  log): this session's boars, or before the first kill of a session the last boar you killed, which
-  is remembered between logins and scaled if you have levelled since. Then it counts your rested XP:
-  those boars give double. So it is right the moment you log in.
-- **XP per hour** and **boars per hour** count this session. **Time to level** uses the last 30
-  minutes once you have played 5 minutes, else the session, and before that the pace you left with
-  last time.
-- **Boars on rested** is the rested pool over what a boar gives without the bonus.
-- **Played** counts while you are logged in and not AFK.
-- Level-ups are written down with the boars and time they took: `/boar levels` lists them.
-
-## Changing the numbers
-
-Right-click the panel, or `/boar edit`: boars killed, deaths, time played (like `14h30m`), XP from
-boars, XP from other things. Only boxes you change are saved. Or from chat: `/boar set kills 1000`,
-`/boar set played 14h30m`.
-
-Every character starts at 0, yours and anyone else's, except Stealthboar, who had 1000 boars before
-this addon existed and starts there. If the old Boaring Challenge addon's data is still on the
-account, chat says once what it counted and the command to take it over.
+- **Kill**: "You have slain X!", "X dies, you gain N experience.", or "X dies." on your target (pet kills).
+- **Boar**: anything the game calls a Boar when you target it.
+- Also any name with boar, goretusk or agam'ar, and names you add with `/boar add`.
+- **Boars to level**: uses what a boar gives without rested. Rested boars count double.
+- It uses your last boar before the first kill of a session, so it is right at login.
+- **Per hour**: this session.
+- **Time to level**: last 30 minutes (after 5 minutes played), else the session, else last time's pace.
+- **Boars on rested**: rested pool over what a boar gives.
+- **Played**: counts while logged in and not AFK.
+- **Levels**: each level-up is saved with its boars and time. See `/boar levels`.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `/boar` | Show or hide the panel, remembered for this character only |
-| `/boar edit` | Settings: your numbers, what the panel shows, its size |
-| `/boar where` | Boars here, and now, next and later |
-| `/boar route` | Your road to 60: every stop, its boars, map position and boar count |
+| `/boar` | Show or hide the panel (per character) |
+| `/boar edit` | Settings: numbers, what shows, size |
+| `/boar where` | Boars here, now, next and later |
+| `/boar route` | Road to 60: stops, boars, map positions, boar counts |
 | `/boar route all` | Every boar known, low to high |
-| `/boar show <thing>` | One thing on the panel on or off; `/boar show` lists them |
-| `/boar scale 1.2` | The panel's size, 0.6 to 2 |
-| `/boar set kills 1000` | Set one number: `kills`, `deaths`, `played`, `xp` (from boars), `otherxp` |
-| `/boar add <name>` | Count this creature as a boar (no name: your target) |
+| `/boar show <thing>` | One thing on or off; `/boar show` lists them |
+| `/boar scale 1.2` | Panel size, 0.6 to 2 |
+| `/boar set kills 1000` | Set `kills`, `deaths`, `played`, `xp` (boars) or `otherxp` |
+| `/boar add <name>` | Count it as a boar (no name: your target) |
 | `/boar remove <name>` | Stop counting it |
 | `/boar list` | Boars killed, by kind |
-| `/boar levels` | When each level came, with the boars and time it took |
-| `/boar session` | Start the session counters again |
-| `/boar lock` | Lock or unlock the panel for dragging (Shift-drag works any time) |
-| `/boar reset` | Everything for this character back to zero (asks twice) |
+| `/boar levels` | Each level with its boars and time |
+| `/boar session` | Session counters start again |
+| `/boar lock` | Lock or unlock the panel (Shift-drag always works) |
+| `/boar reset` | This character back to zero (asks twice) |
+| `/boar help` | List the commands |
 
-## Installing
+## Install
 
-Copy the `BoarChallengePlus` folder into `Interface\AddOns\`, or run `node tools/install.js` from
-this folder. `node tools/check-lua.js .` checks the code against Lua 5.0 and the 1.12 API.
+- Copy the `BoarChallengePlus` folder into `Interface\AddOns\`, or update through your launcher.
+- Or run `node tools/install.js` from this folder.
+- `node tools/check-lua.js .` checks the code (Lua 5.0, 1.12 API).

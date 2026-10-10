@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.4.3"
+BC.VERSION = "1.4.4"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -129,7 +129,7 @@ local function OldAddonHint()
   local n = math.floor(BoaringChallengeDB.totalKills)
   local level = tonumber(BoaringChallengeDB.characterLevel)
   BC.Print("the old Boaring Challenge counted " .. BC.Num(n) .. " boars" .. (level and (" on a level " .. level .. " character") or "") ..
-    ". If that was this character, type " .. GOLD .. "/boar set kills " .. n .. END .. ". Anyone else starts at 0.")
+    ". If that was you, type " .. GOLD .. "/boar set kills " .. n .. END .. ".")
 end
 
 ------------------------------------------------------------------------------------------------------
@@ -335,13 +335,13 @@ local function SetValue(what, value)
   elseif what == "played" or what == "time" then
     local secs = BC.ParseTime(value)
     if not secs then
-      BC.Print("say the time like 14h30m, 90m or 14.5 (hours).")
+      BC.Print("time like 14h30m, 90m or 14.5.")
       return
     end
     c.played = secs
     BC.Print("time played set to " .. BC.Time(c.played) .. ".")
   else
-    BC.Print("you can set: kills, deaths, played, xp (from boars), otherxp. For example " .. GOLD .. "/boar set kills 1000" .. END)
+    BC.Print("set kills, deaths, played, xp or otherxp. Like " .. GOLD .. "/boar set kills 1000" .. END)
     return
   end
   if BC.Refresh then BC.Refresh() end
@@ -378,7 +378,7 @@ end
 local function ListLevels()
   local c = BC.char
   if table.getn(c.levels) == 0 then
-    BC.Print("no level-ups seen yet. The first one gets written down with the boars and time it took.")
+    BC.Print("no level-ups seen yet.")
     return
   end
   BC.Print("levels reached:")
@@ -390,19 +390,29 @@ local function ListLevels()
 end
 
 local function Help()
-  BC.Print("v" .. BC.VERSION .. " commands:")
+  BC.Print("v" .. BC.VERSION)
   local lines = {
+    GOLD .. "Panel" .. END,
     "/boar" .. GREY .. "  show or hide the panel" .. END,
-    "/boar edit" .. GREY .. "  settings: your numbers, what the panel shows, its size (or right-click the panel)" .. END,
-    "/boar set kills 1000" .. GREY .. "  also: deaths, played (14h30m), xp, otherxp" .. END,
-    "/boar add <name>" .. GREY .. "  count this creature as a boar;  " .. END .. "/boar remove <name>",
-    "/boar where" .. GREY .. "  boars here, and where to go next;  " .. END .. "/boar route" .. GREY .. "  your road to 60;  " .. END .. "/boar route all" .. GREY .. "  every boar" .. END,
-    "/boar show <thing>" .. GREY .. "  one thing on the panel on or off;  " .. END .. "/boar scale 1.2" .. GREY .. "  the panel's size" .. END,
-    "/boar list" .. GREY .. "  boars killed by kind;  " .. END .. "/boar levels" .. GREY .. "  when each level came" .. END,
-    "/boar session" .. GREY .. "  start the session counters again;  " .. END .. "/boar lock" .. GREY .. "  lock or unlock the panel (Shift-drag works any time)" .. END,
-    "/boar reset" .. GREY .. "  everything for this character back to zero" .. END,
+    "/boar edit" .. GREY .. "  settings (or right-click the panel)" .. END,
+    "/boar show <thing>" .. GREY .. "  one thing on or off" .. END,
+    "/boar scale 1.2" .. GREY .. "  panel size, 0.6 to 2" .. END,
+    "/boar lock" .. GREY .. "  lock or unlock (Shift-drag always works)" .. END,
+    GOLD .. "Where to go" .. END,
+    "/boar where" .. GREY .. "  boars here, and where next" .. END,
+    "/boar route" .. GREY .. "  your road to 60" .. END,
+    "/boar route all" .. GREY .. "  every boar known" .. END,
+    GOLD .. "Boars" .. END,
+    "/boar add <name>" .. GREY .. "  count it as a boar" .. END,
+    "/boar remove <name>" .. GREY .. "  stop counting it" .. END,
+    "/boar list" .. GREY .. "  boars killed, by kind" .. END,
+    "/boar levels" .. GREY .. "  each level's boars and time" .. END,
+    GOLD .. "Numbers" .. END,
+    "/boar set kills 1000" .. GREY .. "  also deaths, played, xp, otherxp" .. END,
+    "/boar session" .. GREY .. "  new session" .. END,
+    "/boar reset" .. GREY .. "  this character back to zero" .. END,
   }
-  for i = 1, table.getn(lines) do DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. lines[i]) end
+  for i = 1, table.getn(lines) do DEFAULT_CHAT_FRAME:AddMessage("  " .. WHITE .. lines[i]) end
 end
 
 local resetAsked = 0
@@ -423,7 +433,7 @@ local function Slash(msg)
     rest = BC.Trim(rest)
     if rest == "" then rest = UnitName("target") or "" end
     if rest == "" then
-      BC.Print("say the creature's name, or target it: /boar add Mottled Boar")
+      BC.Print("name it or target it: /boar add Mottled Boar")
     else
       BC.char.extra[rest] = true
       BC.Print(WHITE .. rest .. END .. " counts as a boar from now on.")
@@ -444,7 +454,7 @@ local function Slash(msg)
       BC.SetScale(n)
       BC.Print("panel size " .. math.floor(BC.db.scale * 100 + 0.5) .. "%.")
     else
-      BC.Print("say the size like " .. GOLD .. "/boar scale 1.2" .. END .. " (0.6 to 2), or use the Size buttons in " .. GOLD .. "/boar edit" .. END .. ".")
+      BC.Print("size like " .. GOLD .. "/boar scale 1.2" .. END .. " (0.6 to 2).")
     end
   elseif word == "show" then
     local key = nil
@@ -459,7 +469,7 @@ local function Slash(msg)
     else
       local keys = {}
       for i = 1, table.getn(BC.ITEMS or {}) do table.insert(keys, BC.ITEMS[i].key) end
-      BC.Print("things on the panel: " .. table.concat(keys, ", ") .. ". " .. GOLD .. "/boar show <thing>" .. END .. " switches one; right-click the panel for checkboxes.")
+      BC.Print("things on the panel: " .. table.concat(keys, ", ") .. ". " .. GOLD .. "/boar show <thing>" .. END .. " switches one.")
     end
   elseif word == "list" then
     ListNames()
@@ -469,14 +479,14 @@ local function Slash(msg)
     BC.ResetSession()
   elseif word == "lock" or word == "unlock" or word == "move" then
     BC.db.locked = not BC.db.locked
-    BC.Print("panel " .. (BC.db.locked and "locked." or "unlocked: drag it where you want, then /boar lock."))
+    BC.Print("panel " .. (BC.db.locked and "locked." or "unlocked. Drag it, then /boar lock."))
     if BC.Refresh then BC.Refresh() end
   elseif word == "reset" then
     if GetTime() - resetAsked < 10 then
       BC.ResetAll()
     else
       resetAsked = GetTime()
-      BC.Print(RED .. "this wipes every number for this character." .. END .. " Type " .. GOLD .. "/boar reset" .. END .. " again within 10 seconds to do it.")
+      BC.Print(RED .. "wipes every number for this character." .. END .. " Type " .. GOLD .. "/boar reset" .. END .. " again in 10 seconds.")
     end
   else
     Help()
@@ -509,12 +519,12 @@ events:SetScript("OnEvent", function()
     BC.session.startedAt = GetTime()
     if BC.InitPanel then BC.InitPanel() end
     BC.Print("v" .. BC.VERSION .. " counting for " .. GOLD .. (UnitName("player") or "you") .. END .. ": " ..
-      BC.Num(BC.char.kills) .. " boars so far. " .. GOLD .. "/boar" .. END .. " for the panel, " .. GOLD .. "/boar help" .. END .. " for commands.")
+      BC.Num(BC.char.kills) .. " boars. " .. GOLD .. "/boar" .. END .. " panel, " .. GOLD .. "/boar help" .. END .. " commands.")
     -- Stealthboar had 1000 boars before this addon existed (993 on the old addon, a few more since). Everyone else starts at 0.
     if BC.char.kills == 0 and not BC.char.seeded and UnitName("player") == "Stealthboar" then
       BC.char.seeded = true
       BC.char.kills = 1000
-      BC.Print("starting from the 1000 boars killed before this addon. Right-click the panel if that is off.")
+      BC.Print("starting at 1000 boars. Right-click the panel to change it.")
     end
     OldAddonHint()
   elseif not BC.char then

@@ -491,8 +491,8 @@ function BC.PrintWhere()
   DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. "Now" .. END .. "  " .. BC.NowLine(level))
   DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. "Next" .. END .. "  " .. BC.NextLine(level))
   DEFAULT_CHAT_FRAME:AddMessage("  " .. GOLD .. "Later" .. END .. "  " .. BC.LaterLine(level))
-  BC.Print(GREY .. "/boar route shows every stop with its boars and map position. " ..
-    (BC.RowsAreLive() and "From pfQuest's database on this server." or "From the built-in list; install pfQuest for this server's own.") .. END)
+  BC.Print(GREY .. "/boar route: every stop and map position. " ..
+    (BC.RowsAreLive() and "Data: pfQuest." or "Data: built-in list. pfQuest adds this server's.") .. END)
 end
 
 -- Every boar known, low to high, as it comes from the database.
