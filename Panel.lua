@@ -39,6 +39,7 @@ BC.ITEMS = {
   { g = "num", c = "boars", key = "sessionKills", label = "Boars this session", on = true, tip = "Boars since login or New session." },
   { g = "num", c = "boars", key = "thisLevel", label = "Boars this level", on = false, tip = "Boars since you reached this level." },
   { g = "num", c = "boars", key = "bphRecent", label = "Boars/h last 30 min", on = false, tip = "Boars per hour, last 30 minutes." },
+  { g = "num", c = "boars", key = "to60", label = "Boars to 60", on = false, tip = "About how many boars are left to level 60, by the road. Counts rested XP." },
   { g = "num", c = "boars", key = "lastBoars", label = "Boars last level", on = false, tip = "Boars the last level took. Shows after 2 level-ups." },
   { g = "num", c = "xp", key = "xph", label = "XP per hour", on = true, tip = "This session's XP per hour." },
   { g = "num", c = "xp", key = "xpb", label = "XP per boar", on = true, tip = "What the next boar gives. Double while rested." },
@@ -95,6 +96,10 @@ local VALUE = {
   lastBoars = function(st) return st.lastLevelFull and BC.Num(st.lastLevelKills) or DASH end,
   lastTime = function(st) return st.lastLevelFull and BC.Time(st.lastLevelTime) or DASH end,
   deaths = function(st) return tostring(st.deaths) end,
+  to60 = function(st)
+    local n = BC.BoarsTo60 and BC.BoarsTo60(st.level)
+    return n and ("~" .. BC.Num(n)) or DASH
+  end,
   boarShare = function(st) return st.boarShare and (st.boarShare .. "%") or DASH end,
   best = function(st) return Rate(st.bestXPHour) end,
 }
@@ -664,7 +669,7 @@ local function BuildEdit()
       x, y = 22, -366 - adviceRow * 20
       adviceRow = adviceRow + 1
     else
-      x, y = 212 + math.floor(numRow / 10) * 190, -202 - math.mod(numRow, 10) * 20
+      x, y = 212 + math.floor(numRow / 11) * 190, -202 - math.mod(numRow, 11) * 20
       numRow = numRow + 1
     end
     local name = "BoarChallengePlusShow" .. it.key

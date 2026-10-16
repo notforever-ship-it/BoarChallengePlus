@@ -396,6 +396,17 @@ function BC.StageBoars(stage, level)
   return math.floor(total + 0.5)
 end
 
+-- About how many boars are left to level 60: every stop of the road added up. Nil when the road stops short of 60.
+function BC.BoarsTo60(level)
+  if level >= 60 then return 0 end
+  local stages = BC.Plan(level, GetZoneText())
+  local n = table.getn(stages)
+  if n == 0 or stages[n].to < 60 then return nil end
+  local total = 0
+  for i = 1, n do total = total + BC.StageBoars(stages[i], level) end
+  return total
+end
+
 -- "Redridge Mountains or Loch Modan"
 local function AlsoText(stage, most)
   local names = {}

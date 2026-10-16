@@ -42,7 +42,7 @@ Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 - Every box works as soon as you click it.
 - **Top**: title, name, boars to level, boars killed, XP bar, bar numbers, rested, background.
 - **Advice**: here, now, next, later.
-- **Boars**: killed, per hour, this session, this level, last 30 min, last level.
+- **Boars**: killed, per hour, this session, this level, last 30 min, last level, to 60.
 - **XP**: per hour, per boar, last 30 min, to level, this session, best per hour, share from boars.
 - **Time**: to level, played, this session, last level.
 - **Other**: rested XP, boars on rested, deaths.
@@ -91,6 +91,7 @@ From Westfall at level 18:
 - **Boar**: anything the game calls a Boar when you target it.
 - Also any name with boar, goretusk or agam'ar, and names you add with `/boar add`.
 - **Boars to level**: uses what a boar gives without rested. Rested boars count double.
+- **Boars to 60**: every stop of the road added up, by the game's XP rules. A rough guide.
 - It uses your last boar before the first kill of a session, so it is right at login.
 - **Per hour**: this session.
 - **Time to level**: last 30 minutes (after 5 minutes played), else the session, else last time's pace.
