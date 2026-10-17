@@ -590,7 +590,7 @@ local resetClicks = 0
 local function BuildEdit()
   edit = CreateFrame("Frame", "BoarChallengePlusEdit", UIParent)
   edit:SetWidth(600)
-  edit:SetHeight(520)
+  edit:SetHeight(560)
   edit:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
   edit:SetFrameStrata("DIALOG")
   edit:SetClampedToScreen(true)
@@ -616,7 +616,7 @@ local function BuildEdit()
   sub:SetPoint("TOP", head, "BOTTOM", 0, -3)
   sub:SetText(GREY .. "Settings for " .. (UnitName("player") or "this character") .. END)
   local credit = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  credit:SetPoint("BOTTOM", edit, "BOTTOM", 0, 24)
+  credit:SetPoint("BOTTOM", edit, "BOTTOM", 0, 48)
   credit:SetText(GREY .. "Made by " .. END .. "|cffabd473stealthzi" .. END .. GREY .. "   v" .. BC.VERSION .. END)
   local close = CreateFrame("Button", "BoarChallengePlusEditClose", edit, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", edit, "TOPRIGHT", -6, -6)
@@ -656,7 +656,7 @@ local function BuildEdit()
   end)
 
   Heading("Top", 24, -188, true)
-  Heading("Advice", 24, -352, true)
+  Heading("Advice", 24, -364, true)
   Heading("Numbers", 214, -188, true)
   local topRow, adviceRow, numRow = 0, 0, 0
   for i = 1, table.getn(BC.ITEMS) do
@@ -666,7 +666,7 @@ local function BuildEdit()
       x, y = 22, -202 - topRow * 20
       topRow = topRow + 1
     elseif it.g == "advice" then
-      x, y = 22, -366 - adviceRow * 20
+      x, y = 22, -378 - adviceRow * 20
       adviceRow = adviceRow + 1
     else
       x, y = 212 + math.floor(numRow / 11) * 190, -202 - math.mod(numRow, 11) * 20
@@ -690,9 +690,9 @@ local function BuildEdit()
   end
 
   -- size and lock
-  Heading("Size", 24, -452)
+  Heading("Size", 24, -470)
   local smaller = Button("BoarChallengePlusEditSmaller", "-", 26, "Smaller panel.")
-  smaller:SetPoint("TOPLEFT", edit, "TOPLEFT", 64, -448)
+  smaller:SetPoint("TOPLEFT", edit, "TOPLEFT", 64, -466)
   smaller:SetScript("OnClick", function() BC.SetScale((BC.db.scale or 1) - 0.1) end)
   sizeText = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
   sizeText:SetPoint("LEFT", smaller, "RIGHT", 8, 0)
@@ -703,7 +703,7 @@ local function BuildEdit()
   lockCheck = CreateFrame("CheckButton", "BoarChallengePlusEditLock", edit, "UICheckButtonTemplate")
   lockCheck:SetWidth(20)
   lockCheck:SetHeight(20)
-  lockCheck:SetPoint("TOPLEFT", edit, "TOPLEFT", 290, -449)
+  lockCheck:SetPoint("TOPLEFT", edit, "TOPLEFT", 290, -467)
   getglobal("BoarChallengePlusEditLockText"):SetText("Locked (Shift-drag still moves it)")
   lockCheck:SetScript("OnClick", function() BC.db.locked = this:GetChecked() and true or false end)
   Explain(lockCheck, "Locked", "Only moves with Shift held down.")
