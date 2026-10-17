@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.4.7"
+BC.VERSION = "1.5.0"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -19,6 +19,7 @@ local WINDOW = 1800                                    -- seconds: the "last 30 
 local DOUBLE = 1.5                                     -- seconds: the same death seen twice is one kill
 
 local DEFAULTS = { locked = true, scale = 1 }
+local OPTIONS = { "levelUp", "milestones", "records", "goal", "deathNotes", "streaks" }   -- the message switches, on at first
 
 BC.session = { startedAt = 0, kills = 0, xp = 0, boarXP = 0, boarBase = 0, played = 0, deaths = 0 }
 local recent = {}        -- { at, xp, kill }: the last hour, for the "last 30 min" rate
@@ -115,6 +116,30 @@ local function InitDB()
   if type(c.extra) ~= "table" then c.extra = {} end        -- names you added with /boar add
   if not c.startedAt then c.startedAt = time() end
   if not c.startLevel then c.startLevel = UnitLevel("player") end
+  -- 1.5: the messages, records, boars per day and death notes
+  if type(c.opt) ~= "table" then c.opt = {} end
+  if c.opt.lines ~= "off" and c.opt.lines ~= "rare" and c.opt.lines ~= "normal" then c.opt.lines = "rare" end
+  for i = 1, table.getn(OPTIONS) do
+    if type(c.opt[OPTIONS[i]]) ~= "boolean" then c.opt[OPTIONS[i]] = true end
+  end
+  if type(c.records) ~= "table" then c.records = {} end
+  if type(c.records.pace) ~= "table" then c.records.pace = {} end      -- { bph, level, at }: best level pace
+  c.records.level = nil                                                -- 1.5.0 test builds: the fastest level
+  if type(c.records.hour) ~= "table" then c.records.hour = {} end      -- { n, at }: most boars in 60 minutes
+  if type(c.records.day) ~= "table" then c.records.day = {} end        -- { n, day }: most boars in a day
+  if type(c.records.streak) ~= "table" then c.records.streak = {} end  -- { n, at }: most boars in a row
+  if type(c.streak) ~= "table" then c.streak = {} end                  -- { n, last, base }: the streak now
+  if type(c.streak.n) ~= "number" then c.streak.n = 0 end
+  if type(c.streak.last) ~= "number" then c.streak.last = 0 end
+  if type(c.hourKills) ~= "table" then c.hourKills = {} end            -- time() of each boar, the last hour
+  if type(c.days) ~= "table" then c.days = {} end                      -- ["2026-10-17"] = boars that day
+  for day, n in pairs(c.days) do
+    if type(day) ~= "string" or type(n) ~= "number" then c.days[day] = nil end
+  end
+  if c.goal ~= nil and (type(c.goal) ~= "number" or c.goal < 1) then c.goal = nil end   -- nil: beat yesterday
+  if type(c.deathLog) ~= "table" then c.deathLog = {} end
+  if type(BC.db.seen) ~= "table" then BC.db.seen = {} end              -- funny lines shown lately, per kind
+  if type(BC.db.lastLine) ~= "table" then BC.db.lastLine = {} end
   BC.char = c
 end
 
@@ -157,6 +182,366 @@ local function LearnTarget()
 end
 
 ------------------------------------------------------------------------------------------------------
+-- Funny lines, milestones, records, boars per day, and where you died
+------------------------------------------------------------------------------------------------------
+
+local MILESTONES = { 100, 250, 500, 1000, 2500, 5000, 7500, 10000 }   -- then every 5,000
+local LINE_GAP = { rare = 900, normal = 420 }   -- seconds between funny lines while you kill, about
+local LINE_COLOUR = "|cffffe0b8"
+local nextLineAt = nil   -- GetTime() of the next funny line
+local lastHit = nil      -- { name, at }: the last thing that hurt you, for the death notes
+local hourBase = false   -- the best hour when this session's first boar fell (nil: none yet). false: not looked yet
+local STREAK_GAP = 90    -- seconds: a longer wait between boars ends the streak
+local STREAKS = { 5, 10, 25, 50, 100 }
+
+-- A funny line of this kind, or nil when they are off.
+local function FunLine(kind)
+  if BC.char.opt.lines == "off" or not BC.PickLine then return nil end
+  return BC.PickLine(kind)
+end
+
+local function SayLine(line)
+  if line then BC.Print(LINE_COLOUR .. line .. END) end
+end
+
+local function Banner(title, text, foot, secs)
+  if BC.Banner then BC.Banner(title, text, foot, secs) end
+end
+
+function BC.SetLines(mode)
+  BC.char.opt.lines = mode
+  nextLineAt = nil
+end
+
+-- "2026-10-17", by this PC's clock.
+function BC.Today()
+  return date("%Y-%m-%d")
+end
+
+-- Noon, so many days ago: counting back from noon, a clock change in the night can't skip a day.
+local function Noon(back)
+  local now = time()
+  local secs = tonumber(date("%H", now)) * 3600 + tonumber(date("%M", now)) * 60 + tonumber(date("%S", now))
+  return now - secs + 43200 - back * 86400
+end
+
+function BC.Yesterday()
+  return date("%Y-%m-%d", Noon(1))
+end
+
+-- The last 7 days, oldest first: { day = "2026-10-17", name = "Fri", n = boars, today = true/nil }
+function BC.WeekDays()
+  local list = {}
+  for back = 6, 0, -1 do
+    local t = Noon(back)
+    local day = date("%Y-%m-%d", t)
+    table.insert(list, { day = day, name = date("%a", t), n = BC.char.days[day] or 0, today = (back == 0) or nil })
+  end
+  return list
+end
+
+function BC.TodayKills()
+  return BC.char.days[BC.Today()] or 0
+end
+
+function BC.YesterdayKills()
+  return BC.char.days[BC.Yesterday()] or 0
+end
+
+-- The day's goal: the number you set, else one more than yesterday (or than the last day you played).
+-- Also returns the day it has to beat, when it is that second kind.
+function BC.DayGoal()
+  local c = BC.char
+  if c.goal then return c.goal, nil end
+  local y = BC.Yesterday()
+  if (c.days[y] or 0) > 0 then return c.days[y] + 1, y end
+  local today, last = BC.Today(), nil
+  for day, n in pairs(c.days) do
+    if day < today and n > 0 and (not last or day > last) then last = day end
+  end
+  if last then return c.days[last] + 1, last end
+  return nil, nil
+end
+
+-- Keeps the last 14 days.
+local function PruneDays()
+  local list = {}
+  for day in pairs(BC.char.days) do table.insert(list, day) end
+  table.sort(list, function(a, b) return a > b end)
+  for i = 15, table.getn(list) do BC.char.days[list[i]] = nil end
+end
+
+function BC.IsMilestone(n)
+  for i = 1, table.getn(MILESTONES) do
+    if MILESTONES[i] == n then return true end
+  end
+  return n > 10000 and math.mod(n, 5000) == 0
+end
+
+-- 480 -> "8 minutes", over an hour "1h 05m"
+local function Span(secs)
+  local m = math.floor(secs / 60 + 0.5)
+  if m < 60 then return m .. (m == 1 and " minute" or " minutes") end
+  return BC.Time(secs)
+end
+
+local function NewRecord(what, value)
+  if not BC.char.opt.records then return end
+  local line = FunLine("record")
+  Banner("NEW RECORD!", what .. ": " .. value, line, 5)
+  BC.Print(GOLD .. "NEW RECORD!" .. END .. " " .. what .. ": " .. WHITE .. value .. END)
+  SayLine(line)
+  PlaySound("LEVELUPSOUND")
+end
+
+-- How long the level that ended at c.levels[i] took in time played, or nil when the addon didn't see all of it.
+local function LevelTook(i)
+  local c = BC.char
+  local l, prev = c.levels[i], c.levels[i - 1]
+  if not l then return nil end
+  if l.took then
+    if l.full and l.took > 0 then return l.took end
+    return nil
+  end
+  -- saved before 1.5: two level-ups in a row tell it
+  if prev and prev.level == l.level - 1 and l.played > prev.played then return l.played - prev.played end
+  return nil
+end
+
+-- The best level pace: boars per hour over a whole level (its boars / its time played), for levels 5 and up that
+-- the addon saw from start to end. The first one is kept quietly; only beating it makes a fuss.
+local PACE_FROM = 5
+local function PaceRecord(i, quiet)
+  local c = BC.char
+  local level = c.levels[i].level - 1          -- the level that just ended
+  local took = LevelTook(i)
+  if level < PACE_FROM or not took or took < 60 then return end
+  local boars = c.byLevel[level] or 0
+  if boars < 1 then return end
+  local bph = boars / took * 3600
+  local r = c.records.pace
+  if r.bph and bph <= r.bph then return end
+  local first = not r.bph
+  r.bph, r.level, r.at = bph, level, time()
+  if not first and not quiet then
+    NewRecord("Best level pace", BC.Num(bph) .. " boars per hour on level " .. level)
+  end
+end
+
+-- At login: the time on this level so far, if the addon saw it start. And the best level pace from the levels saved
+-- before records existed.
+local function StartClocks()
+  local c = BC.char
+  if type(c.levelPlayed) ~= "number" then
+    c.levelPlayed, c.levelFull = 0, false
+    local level = UnitLevel("player") or 0
+    local n = table.getn(c.levels)
+    if n > 0 and c.levels[n].level == level and c.played >= (c.levels[n].played or 0) then
+      c.levelPlayed, c.levelFull = c.played - (c.levels[n].played or 0), true
+    elseif level == 1 and (UnitXP("player") or 0) == 0 then
+      c.levelFull = true
+    end
+  end
+  if type(c.levelFull) ~= "boolean" then c.levelFull = false end
+  if not c.records.pace.bph then
+    for i = 1, table.getn(c.levels) do PaceRecord(i, true) end
+  end
+  PruneDays()
+end
+
+-- "412 boars, 1h 12m. 8 minutes faster than last level." for the level that ended at c.levels[i].
+local function LevelText(i)
+  local c = BC.char
+  local l = c.levels[i]
+  local text = BC.Num(c.byLevel[l.level - 1] or 0) .. " boars"
+  local took, before = LevelTook(i), LevelTook(i - 1)
+  if took then text = text .. ", " .. BC.Time(took) end
+  text = text .. "."
+  if took and before then
+    local d = took - before
+    if math.abs(d) < 60 then
+      text = text .. " Same pace as last level."
+    elseif d < 0 then
+      text = text .. " " .. Span(-d) .. " faster than last level."
+    else
+      text = text .. " " .. Span(d) .. " slower than last level."
+    end
+  end
+  return text
+end
+
+local function ShowLevelUp(i)
+  local c = BC.char
+  local l = c.levels[i]
+  local line = FunLine("level")
+  if c.opt.levelUp then
+    local text = LevelText(i)
+    Banner("Level " .. l.level .. "!", text, line, 6)
+    BC.Print("level " .. (l.level - 1) .. " done: " .. text)
+  elseif line then
+    Banner(nil, line, nil, 4)
+  end
+  SayLine(line)
+end
+
+local function Milestone(n)
+  local line = FunLine("milestone")
+  Banner(BC.Num(n) .. " boars!", line, nil, 5)
+  BC.Print(GOLD .. BC.Num(n) .. " boars killed!" .. END)
+  SayLine(line)
+end
+
+local function GoalBanner(d, goal, base)
+  local line = FunLine("goal")
+  local text = BC.Num(d) .. " boars today."
+  if base == BC.Yesterday() then
+    text = text .. " You beat yesterday's " .. BC.Num(goal - 1) .. "."
+  elseif base then
+    text = text .. " You beat your last day, " .. BC.Num(goal - 1) .. " on " .. base .. "."
+  end
+  Banner("Daily goal reached!", text, line, 5)
+  BC.Print(GOLD .. "Daily goal reached!" .. END .. " " .. text)
+  SayLine(line)
+end
+
+-- The streak: boars in a row with no break. A break is a wait over 90 seconds, eating, drinking, AFK or dying.
+-- c.streak = { n, last = time() of the last boar, base = the best streak when this one started }
+function BC.StreakNow()
+  local s = BC.char.streak
+  if s.n > 0 and time() - s.last > STREAK_GAP then return 0 end
+  return s.n
+end
+
+function BC.BreakStreak()
+  if BC.char and BC.char.streak.n > 0 then
+    BC.char.streak.n = 0
+    if BC.Refresh then BC.Refresh() end
+  end
+end
+
+local function Streak(now)
+  local c = BC.char
+  local s, r = c.streak, c.records.streak
+  if s.n > 0 and now - s.last > STREAK_GAP then s.n = 0 end
+  if s.n == 0 then s.base = r.n end
+  s.n, s.last = s.n + 1, now
+  if s.n > (r.n or 0) then
+    r.n, r.at = s.n, now
+    if s.base and s.n == s.base + 1 then NewRecord("Longest streak", BC.Num(s.n) .. " boars in a row") end
+  end
+  if not c.opt.streaks then return end
+  for i = 1, table.getn(STREAKS) do
+    if STREAKS[i] == s.n then
+      local line = FunLine("streak")
+      Banner(s.n .. " boars in a row, no break!", line, nil, 4)
+      BC.Print(GOLD .. s.n .. " boars in a row, no break!" .. END)
+      SayLine(line)
+    end
+  end
+end
+
+-- After each boar: the best hour and day, milestones, the day's goal, and now and then a funny line.
+local function AfterKill()
+  local c = BC.char
+  local now = time()
+  -- boars in the last 60 minutes. Raising a record you set within the hour is the same run, so it stays quiet.
+  table.insert(c.hourKills, now)
+  while c.hourKills[1] and now - c.hourKills[1] >= 3600 do table.remove(c.hourKills, 1) end
+  local n = table.getn(c.hourKills)
+  local r = c.records.hour
+  if hourBase == false then hourBase = r.n end
+  if n > (r.n or 0) then
+    r.n, r.at = n, now
+    -- one fuss per session, when it beats the best from before the session
+    if hourBase and n == hourBase + 1 then NewRecord("Most boars in one hour", BC.Num(n)) end
+  end
+    Streak(now)
+  -- boars today; today raising its own record stays quiet
+  local today = BC.Today()
+  if not c.days[today] then
+    c.days[today] = 0
+    PruneDays()
+  end
+  c.days[today] = c.days[today] + 1
+  local d = c.days[today]
+  r = c.records.day
+  if d > (r.n or 0) then
+    local beat = r.n and r.day ~= today
+    r.n, r.day = d, today
+    if beat then NewRecord("Most boars in one day", BC.Num(d)) end
+  end
+  if c.opt.milestones and BC.IsMilestone(c.kills) then Milestone(c.kills) end
+  -- the day's goal, and passing yesterday (when the goal isn't simply that)
+  if c.opt.goal then
+    local goal, base = BC.DayGoal()
+    local yday = BC.YesterdayKills()
+    if goal and d == goal then
+      GoalBanner(d, goal, base)
+    elseif yday > 0 and d == yday + 1 then
+      local line = FunLine("goal")
+      Banner("You beat yesterday!", BC.Num(d) .. " boars today, " .. BC.Num(yday) .. " yesterday.", line, 5)
+      BC.Print(GOLD .. "You beat yesterday!" .. END .. " " .. BC.Num(d) .. " boars today.")
+      SayLine(line)
+    end
+  end
+  -- a funny line every so often, when nothing else is on screen
+  local mode = c.opt.lines
+  if mode ~= "off" and LINE_GAP[mode] then
+    local t = GetTime()
+    if not nextLineAt then nextLineAt = t + LINE_GAP[mode] * (0.3 + math.random() * 0.4) end
+    if t >= nextLineAt and not (BC.BannerBusy and BC.BannerBusy()) then
+      nextLineAt = t + LINE_GAP[mode] * (0.7 + math.random() * 0.6)
+      local line = FunLine("kill")
+      Banner(nil, line, nil, 4)
+      SayLine(line)
+    end
+  end
+end
+
+-- "X hits you for 5." and the like: remembers X, so a death can say what did it.
+local function Hurt(msg, spell)
+  local _, who
+  if spell then
+    _, _, who = string.find(msg, "^(.+)'s .+ hits you for %d")
+    if not who then _, _, who = string.find(msg, "^(.+)'s .+ crits you for %d") end
+    if not who then _, _, who = string.find(msg, "^You suffer %d+ .- damage from (.+)'s ") end
+  else
+    _, _, who = string.find(msg, "^(.+) hits you for %d")
+    if not who then _, _, who = string.find(msg, "^(.+) crits you for %d") end
+    if not who and string.find(msg, "^You fall and lose") then who = "falling" end
+    if not who and string.find(msg, "^You are drowning") then who = "drowning" end
+    if not who and string.find(msg, "^You lose %d+ health for swimming in lava") then who = "lava" end
+    if not who and string.find(msg, "^You are exhausted and lose") then who = "fatigue" end
+  end
+  if who then lastHit = { name = who, at = GetTime() } end
+end
+
+local function NoteDeath()
+  local c = BC.char
+  if c.opt.deathNotes then
+    -- the map follows you, unless it is open: then leave it where you put it
+    if not (WorldMapFrame and WorldMapFrame:IsVisible()) then SetMapToCurrentZone() end
+    local x, y = GetPlayerMapPosition("player")
+    local killer = "unknown"
+    if lastHit and GetTime() - lastHit.at <= 30 then killer = lastHit.name end
+    local zone = GetZoneText() or "?"
+    table.insert(c.deathLog, {
+      at = time(), zone = zone, sub = GetSubZoneText() or "", level = UnitLevel("player") or 0, killer = killer,
+      x = math.floor((x or 0) * 1000 + 0.5) / 10, y = math.floor((y or 0) * 1000 + 0.5) / 10,
+    })
+    while table.getn(c.deathLog) > 50 do table.remove(c.deathLog, 1) end
+    BC.Print("death noted: " .. WHITE .. killer .. END .. GREY .. ", " .. zone .. ". /boar deaths lists them." .. END)
+  end
+  lastHit = nil
+  BC.BreakStreak()
+  local line = FunLine("death")
+  if line then
+    Banner(nil, line, nil, 4)
+    SayLine(line)
+  end
+end
+
+------------------------------------------------------------------------------------------------------
 -- Counting
 ------------------------------------------------------------------------------------------------------
 
@@ -177,6 +562,7 @@ local function Kill(name)
   c.byLevel[level] = (c.byLevel[level] or 0) + 1
   BC.session.kills = BC.session.kills + 1
   table.insert(recent, { at = now, kill = true })
+  AfterKill()
   if BC.Refresh then BC.Refresh() end
 end
 
@@ -201,8 +587,13 @@ end
 
 local function LevelUp(level)
   local c = BC.char
-  table.insert(c.levels, { level = level, at = time(), kills = c.kills, played = c.played })
+  table.insert(c.levels, { level = level, at = time(), kills = c.kills, played = c.played,
+    took = c.levelPlayed, full = c.levelFull })
   BC.Print(GOLD .. "Level " .. level .. "!" .. END .. " " .. BC.Num(c.kills) .. " boars and " .. BC.Time(c.played) .. " played so far.")
+  local i = table.getn(c.levels)
+  ShowLevelUp(i)
+  PaceRecord(i)
+  c.levelPlayed, c.levelFull = 0, true
   if BC.Refresh then BC.Refresh() end
 end
 
@@ -348,6 +739,7 @@ end
 function BC.ResetSession()
   BC.session = { startedAt = GetTime(), kills = 0, xp = 0, boarXP = 0, boarBase = 0, played = 0, deaths = 0 }
   recent = {}
+  hourBase = false
   BC.Print("session counters start again.")
   if BC.Refresh then BC.Refresh() end
 end
@@ -355,6 +747,7 @@ end
 function BC.ResetAll()
   BoarChallengePlusCharDB = {}
   InitDB()
+  StartClocks()
   BC.ResetSession()
   BC.Print(RED .. "everything for this character is back to zero." .. END)
 end
@@ -387,6 +780,105 @@ local function ListLevels()
   end
 end
 
+local function ListDeaths()
+  local log = BC.char.deathLog
+  local n = table.getn(log)
+  if n == 0 then
+    BC.Print("no deaths noted yet.")
+    return
+  end
+  BC.Print("last deaths, newest first:")
+  for i = n, math.max(1, n - 19), -1 do
+    local d = log[i]
+    local where = d.zone .. ((d.sub ~= "" and d.sub ~= d.zone) and (", " .. d.sub) or "")
+    if (d.x or 0) > 0 or (d.y or 0) > 0 then where = where .. " (" .. d.x .. ", " .. d.y .. ")" end
+    DEFAULT_CHAT_FRAME:AddMessage("  " .. GREY .. date("%m-%d %H:%M", d.at) .. END .. "  " .. RED .. d.killer .. END ..
+      "  level " .. d.level .. "  " .. WHITE .. where .. END)
+  end
+end
+
+local function ListRecords()
+  local r = BC.char.records
+  local dash = GREY .. "none yet" .. END
+  BC.Print("your records:")
+  local lines = {
+    "Best level pace: " .. (r.pace.bph and (WHITE .. BC.Num(r.pace.bph) .. " boars per hour" .. END .. GREY .. "  level " .. r.pace.level .. END) or dash),
+    "Most boars in one hour: " .. (r.hour.n and (WHITE .. BC.Num(r.hour.n) .. END .. GREY .. "  " .. date("%Y-%m-%d", r.hour.at) .. END) or dash),
+    "Most boars in one day: " .. (r.day.n and (WHITE .. BC.Num(r.day.n) .. END .. GREY .. "  " .. r.day.day .. END) or dash),
+    "Longest streak: " .. (r.streak.n and (WHITE .. BC.Num(r.streak.n) .. " in a row" .. END .. GREY .. "  " .. date("%Y-%m-%d", r.streak.at) .. END) or dash),
+  }
+  for i = 1, table.getn(lines) do DEFAULT_CHAT_FRAME:AddMessage("  " .. lines[i]) end
+  DEFAULT_CHAT_FRAME:AddMessage("  " .. GREY .. "Best level pace: levels 5 and up the addon saw from start to end." .. END)
+end
+
+local function ListDays()
+  local list = {}
+  for day, n in pairs(BC.char.days) do table.insert(list, { day = day, n = n }) end
+  table.sort(list, function(a, b) return a.day > b.day end)
+  if table.getn(list) == 0 then
+    BC.Print("no boars counted per day yet.")
+    return
+  end
+  BC.Print("boars per day (last 14):")
+  local today = BC.Today()
+  for i = 1, table.getn(list) do
+    local d = list[i]
+    DEFAULT_CHAT_FRAME:AddMessage("  " .. (d.day == today and GOLD or GREY) .. d.day .. END .. "  " .. WHITE .. BC.Num(d.n) .. END)
+  end
+end
+
+local function GoalCommand(rest)
+  local c = BC.char
+  rest = string.lower(BC.Trim(rest))
+  local n = tonumber(rest)
+  if n and n >= 1 then
+    c.goal = math.floor(n)
+    BC.Print("daily goal set to " .. BC.Num(c.goal) .. " boars. " .. GOLD .. "/boar goal auto" .. END .. " goes back to beating yesterday.")
+  elseif rest == "auto" or rest == "off" then
+    c.goal = nil
+    BC.Print("daily goal: one more than yesterday.")
+  else
+    local goal = BC.DayGoal()
+    BC.Print("today " .. BC.Num(BC.TodayKills()) .. " boars, goal " .. (goal and BC.Num(goal) or "none yet") ..
+      (c.goal and " (set by you)" or " (beat yesterday)") .. ". " .. GOLD .. "/boar goal 200" .. END .. " or " .. GOLD .. "/boar goal auto" .. END .. ".")
+    return
+  end
+  if BC.Refresh then BC.Refresh() end
+end
+
+-- Hidden: /boar test <thing> shows each message once, even when it is switched off.
+local function Test(what)
+  local c = BC.char
+  local pick = BC.PickLine or function() return nil end
+  if what == "line" then
+    local line = pick("kill")
+    Banner(nil, line, nil, 4)
+    SayLine(line)
+  elseif what == "banner" then
+    Banner("Test banner", "The middle line.", "The small line.", 4)
+    Banner("A second one", "It waits for the first.", nil, 3)
+  elseif what == "level" then
+    local level = UnitLevel("player") or 2
+    local text = BC.Num(c.byLevel[level - 1] or 0) .. " boars, 1h 12m. 8 minutes faster than last level."
+    Banner("Level " .. level .. "!", text, pick("level"), 6)
+  elseif what == "milestone" then
+    Banner("1,000 boars!", pick("milestone"), nil, 5)
+  elseif what == "record" then
+    Banner("NEW RECORD!", "Most boars in one hour: 99", pick("record"), 5)
+    PlaySound("LEVELUPSOUND")
+  elseif what == "goal" then
+    Banner("Daily goal reached!", "120 boars today. You beat yesterday's 119.", pick("goal"), 5)
+  elseif what == "streak" then
+    Banner("10 boars in a row, no break!", pick("streak"), nil, 4)
+  elseif what == "death" then
+    local line = pick("death")
+    Banner(nil, line, nil, 4)
+    SayLine(line)
+  else
+    BC.Print("test: line, banner, level, milestone, record, goal, streak, death.")
+  end
+end
+
 local function Help()
   BC.Print("v" .. BC.VERSION)
   local lines = {
@@ -405,6 +897,13 @@ local function Help()
     "/boar remove <name>" .. GREY .. "  stop counting it" .. END,
     "/boar list" .. GREY .. "  boars killed, by kind" .. END,
     "/boar levels" .. GREY .. "  each level's boars and time" .. END,
+    GOLD .. "Goals and records" .. END,
+    "/boar goal 200" .. GREY .. "  daily goal; auto = beat yesterday" .. END,
+    "/boar days" .. GREY .. "  boars per day, last 14" .. END,
+    "/boar week" .. GREY .. "  chart of the last 7 days" .. END,
+    "/boar records" .. GREY .. "  your best level, hour, day, streak" .. END,
+    "/boar deaths" .. GREY .. "  where you died, and to what" .. END,
+    "/boar lines off" .. GREY .. "  funny lines: off, rare or normal" .. END,
     GOLD .. "Numbers" .. END,
     "/boar set kills 1000" .. GREY .. "  also deaths, played, xp, otherxp" .. END,
     "/boar session" .. GREY .. "  new session" .. END,
@@ -473,6 +972,25 @@ local function Slash(msg)
     ListNames()
   elseif word == "levels" then
     ListLevels()
+  elseif word == "deaths" then
+    ListDeaths()
+  elseif word == "records" or word == "record" then
+    ListRecords()
+  elseif word == "days" or word == "day" then
+    ListDays()
+  elseif word == "week" then
+    if BC.ToggleWeek then BC.ToggleWeek() end
+  elseif word == "goal" then
+    GoalCommand(rest)
+  elseif word == "lines" or word == "line" then
+    local mode = string.lower(BC.Trim(rest))
+    if mode == "off" or mode == "rare" or mode == "normal" then
+      BC.SetLines(mode)
+      if BC.FillEdit then BC.FillEdit() end
+    end
+    BC.Print("funny lines: " .. WHITE .. BC.char.opt.lines .. END .. ". " .. GOLD .. "/boar lines off" .. END .. ", rare or normal.")
+  elseif word == "test" then
+    Test(string.lower(BC.Trim(rest)))
   elseif word == "session" then
     BC.ResetSession()
   elseif word == "lock" or word == "unlock" or word == "move" then
@@ -509,6 +1027,25 @@ events:RegisterEvent("PLAYER_DEAD")
 events:RegisterEvent("PLAYER_TARGET_CHANGED")
 events:RegisterEvent("PLAYER_XP_UPDATE")
 events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+events:RegisterEvent("PLAYER_AURAS_CHANGED")
+-- what hurt you, for the death notes
+local HURT = {
+  CHAT_MSG_COMBAT_CREATURE_VS_SELF_HITS = false, CHAT_MSG_COMBAT_HOSTILEPLAYER_HITS = false, CHAT_MSG_COMBAT_SELF_HITS = false,
+  CHAT_MSG_SPELL_CREATURE_VS_SELF_DAMAGE = true, CHAT_MSG_SPELL_HOSTILEPLAYER_DAMAGE = true,
+  CHAT_MSG_SPELL_PERIODIC_SELF_DAMAGE = true,
+}
+for e in pairs(HURT) do events:RegisterEvent(e) end
+
+-- Eating or drinking ends the streak: their buffs have a fork and knife or a drink as the icon.
+local function EatingOrDrinking()
+  local i = 1
+  while UnitBuff("player", i) do
+    local icon = UnitBuff("player", i)
+    if string.find(icon, "Fork&Knife", 1, true) or string.find(icon, "INV_Drink_", 1, true) then return true end
+    i = i + 1
+  end
+  return false
+end
 events:SetScript("OnEvent", function()
   if event == "VARIABLES_LOADED" then
     InitDB()
@@ -525,6 +1062,7 @@ events:SetScript("OnEvent", function()
       BC.Print("starting at 1000 boars. Right-click the panel to change it.")
     end
     OldAddonHint()
+    StartClocks()
   elseif not BC.char then
     return
   elseif event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" then
@@ -552,7 +1090,12 @@ events:SetScript("OnEvent", function()
   elseif event == "PLAYER_DEAD" then
     BC.char.deaths = BC.char.deaths + 1
     BC.session.deaths = BC.session.deaths + 1
+    NoteDeath()
     if BC.Refresh then BC.Refresh() end
+  elseif HURT[event] ~= nil then
+    Hurt(arg1 or "", HURT[event])
+  elseif event == "PLAYER_AURAS_CHANGED" then
+    if BC.char.streak.n > 0 and EatingOrDrinking() then BC.BreakStreak() end
   elseif event == "PLAYER_TARGET_CHANGED" then
     LearnTarget()
   elseif event == "PLAYER_XP_UPDATE" or event == "ZONE_CHANGED_NEW_AREA" then
@@ -563,7 +1106,11 @@ end)
 -- Time played ticks while you are logged in and not AFK.
 events:SetScript("OnUpdate", function()
   if not BC.char then return end
-  if UnitIsAFK and UnitIsAFK("player") then return end
+  if UnitIsAFK and UnitIsAFK("player") then
+    BC.BreakStreak()
+    return
+  end
   BC.char.played = BC.char.played + arg1
+  BC.char.levelPlayed = (BC.char.levelPlayed or 0) + arg1
   BC.session.played = BC.session.played + arg1
 end)

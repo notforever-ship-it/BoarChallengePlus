@@ -35,6 +35,10 @@ Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 - **Now**: stay here until a level, or go somewhere better.
 - **Next**: the next stop and the level to go.
 - **Later**: the stops after that (off at first).
+- **Today**: boars today and the day's goal, with a thin bar that fills toward it. Green when reached.
+- **Yday**: boars yesterday.
+- **Streak**: boars in a row, your best in brackets.
+- **Week chart**: 7 small bars under the panel, today in gold (off at first).
 
 ## Settings
 
@@ -46,9 +50,30 @@ Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 - **XP**: per hour, per boar, last 30 min, to level, this session, best per hour.
 - **Time**: to level, played, this session, last level.
 - **Other**: rested XP, boars on rested, deaths.
+- **Advice and chart**: the advice lines, and the small week chart.
+- **Today**: today, yesterday, streak.
+- **Records**: best level pace, best hour, best day (off at first).
+- **Messages**: funny lines (Off, Rare, Normal), level-up summary, milestones, records, daily goal, death notes, streak messages.
+- **Week chart** button: the big chart.
 - **Size**: smaller and bigger buttons, or `/boar scale 1.2`.
 - **Lock**: then it only moves with Shift.
 - **Defaults**: panel back to how it starts.
+
+## Messages and records
+
+- **Banners**: big text near the top middle, then a line in chat. One at a time.
+- **Funny lines**: now and then while you kill. Rare is about every 15 minutes, Normal about every 7.
+- **Level-up**: boars and time for the level, and how much faster or slower than the last one.
+- **Milestones**: 100, 250, 500, 1,000, 2,500, 5,000, 7,500, 10,000 boars, then every 5,000.
+- **Records**: best level pace, most boars in 60 minutes, most in a day, longest streak. Beat one: NEW RECORD! and a sound.
+- The first time a record is set it stays quiet.
+- Best level pace: boars per hour over a whole level. Only levels 5 and up the addon saw from start to end.
+- **Daily goal**: one more than yesterday, or your own with `/boar goal 200`. A banner when you beat yesterday and when you reach it.
+- No boars yesterday: the goal is one more than the last day you played.
+- **Streak**: ends after 90 seconds with no boar, or when you eat, drink, go AFK or die. Banners at 5, 10, 25, 50, 100.
+- **Death notes**: where you died, your level, and what hit you last. The last 50 are kept.
+- **Week chart**: boars per day for the last 7 days. `/boar week`.
+- Days count by your PC's clock. The last 14 are kept.
 
 ## Your numbers
 
@@ -115,6 +140,12 @@ From Westfall at level 18:
 | `/boar remove <name>` | Stop counting it |
 | `/boar list` | Boars killed, by kind |
 | `/boar levels` | Each level with its boars and time |
+| `/boar goal 200` | Daily goal; `/boar goal auto` = beat yesterday; `/boar goal` shows it |
+| `/boar days` | Boars per day, last 14 days |
+| `/boar week` | Chart of the last 7 days |
+| `/boar records` | Your records |
+| `/boar deaths` | Last 20 deaths: when, what hit you, where |
+| `/boar lines off` | Funny lines `off`, `rare` or `normal` |
 | `/boar session` | Session counters start again |
 | `/boar lock` | Lock or unlock the panel (Shift-drag always works) |
 | `/boar reset` | This character back to zero (asks twice) |

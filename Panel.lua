@@ -33,7 +33,12 @@ BC.ITEMS = {
   { g = "advice", key = "next", label = "Next", on = true, tip = "Where to go after that, and when." },
   { g = "advice", key = "later", label = "Later", on = false, tip = "The stops after that. Full road: /boar route." },
 
-  -- the numbers, in colour groups: boars orange, XP purple, time blue, rested green, deaths red
+  { g = "chart", key = "week", label = "Week chart", on = false, tip = "Small bars under the panel: boars per day, last 7 days. Big one: /boar week." },
+
+  -- the numbers, in colour groups: today gold, boars orange, XP purple, time blue, rested green, deaths red, records pink
+  { g = "num", c = "day", key = "today", label = "Today", on = true, tip = "Boars today, and the day's goal. The bar fills toward the goal." },
+  { g = "num", c = "day", key = "yesterday", label = "Yday", long = "Yesterday", on = true, tip = "Boars yesterday." },
+  { g = "num", c = "day", key = "streak", label = "Streak", on = true, tip = "Boars in a row with no break, and your best in brackets. A wait over 90 seconds, eating, drinking, AFK or dying ends it." },
   { g = "num", c = "boars", key = "kills", label = "Boars killed", on = false, tip = "All your boar kills." },
   { g = "num", c = "boars", key = "bph", label = "Boars per hour", on = true, tip = "This session's boars per hour." },
   { g = "num", c = "boars", key = "sessionKills", label = "Boars this session", on = true, tip = "Boars since login or New session." },
@@ -54,10 +59,16 @@ BC.ITEMS = {
   { g = "num", c = "rested", key = "rested", label = "Rested XP", on = false, tip = "Rested XP left. Boars give double." },
   { g = "num", c = "rested", key = "restedBoars", label = "Boars on rested", on = false, tip = "Boars left on double XP." },
   { g = "num", c = "deaths", key = "deaths", label = "Deaths", on = false, tip = "How many times this character has died." },
+  { g = "num", c = "records", key = "levelPace", label = "Best level pace", on = false, tip = "Most boars per hour over a whole level. Levels 5 and up the addon saw from start to end." },
+  { g = "num", c = "records", key = "bestHour", label = "Best hour", on = false, tip = "Most boars in 60 minutes in a row." },
+  { g = "num", c = "records", key = "bestDay", label = "Best day", on = false, tip = "Most boars in one day." },
 }
 
 -- Each group of numbers in its own colour: the label in the colour, the number a lighter shade of it.
 local COLOURS = {
+  day = { label = { 1.00, 0.84, 0.20 }, value = { 1.00, 0.95, 0.75 } },
+  records = { label = { 1.00, 0.50, 0.80 }, value = { 1.00, 0.85, 0.92 } },
+  week = { label = { 1.00, 0.84, 0.20 } },
   boars = { label = { 1.00, 0.66, 0.34 }, value = { 1.00, 0.87, 0.70 } },
   xp = { label = { 0.78, 0.58, 1.00 }, value = { 0.92, 0.84, 1.00 } },
   time = { label = { 0.45, 0.76, 1.00 }, value = { 0.80, 0.92, 1.00 } },
@@ -100,6 +111,21 @@ local VALUE = {
     return n and ("~" .. BC.Num(n)) or DASH
   end,
   best = function(st) return Rate(st.bestXPHour) end,
+  today = function()
+    local goal = BC.DayGoal()
+    return BC.Num(BC.TodayKills()) .. (goal and (" / " .. BC.Num(goal)) or "")
+  end,
+  yesterday = function() return BC.Num(BC.YesterdayKills()) end,
+  streak = function()
+    local best = BC.char.records.streak.n
+    return BC.Num(BC.StreakNow()) .. (best and ("  (" .. BC.Num(best) .. ")") or "")
+  end,
+  levelPace = function()
+    local r = BC.char.records.pace
+    return r.bph and (BC.Num(r.bph) .. "/h, lvl " .. r.level) or DASH
+  end,
+  bestHour = function() return BC.char.records.hour.n and BC.Num(BC.char.records.hour.n) or DASH end,
+  bestDay = function() return BC.char.records.day.n and BC.Num(BC.char.records.day.n) or DASH end,
 }
 
 -- What each advice line says.
@@ -112,8 +138,11 @@ local ADVICE = {
 
 local panel, title, nameText, bigText, killsText, bar, restBar, barText, sep1, sep2, measure
 local cells, advice, stripes = {}, {}, {}
+local dayTrack, dayFill        -- the thin bar under Today, toward the day's goal
+local weekLabel, mini = nil, {}  -- the small week chart under the panel: { bar, num } per day
+local MINI_H = 18                -- its tallest bar
 local elapsed = 0
-local Draw
+local Draw, DrawWeek
 
 local BACKDROP = {
   bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -189,6 +218,8 @@ function BC.Layout()
   sep1:Hide()
   sep2:Hide()
   for i = 1, STRIPES do stripes[i]:Hide() end
+  dayTrack:Hide()
+  dayFill:Hide()
   local on = {}
   for i = 1, table.getn(BC.ITEMS) do
     local it = BC.ITEMS[i]
@@ -219,6 +250,12 @@ function BC.Layout()
       local ly = y - row * LINE_H
       Put(c.label, true, "TOPLEFT", "TOPLEFT", x, ly - 3)
       Put(c.value, true, "TOPRIGHT", "TOPLEFT", x + CELL_W, ly - 3)
+      if c.key == "today" then
+        dayTrack:ClearAllPoints()
+        dayTrack:SetPoint("TOPLEFT", panel, "TOPLEFT", x, ly - 16)
+        dayFill:ClearAllPoints()
+        dayFill:SetPoint("TOPLEFT", panel, "TOPLEFT", x, ly - 16)
+      end
       if col == 0 and stripes[row + 1] then
         local s = stripes[row + 1]
         local rgb = COLOURS[group].label
@@ -266,6 +303,26 @@ function BC.Layout()
     end
   end
 
+  -- the small week chart: a label, then 7 thin bars with their numbers, today in gold
+  weekLabel:Hide()
+  for i = 1, 7 do
+    mini[i].bar:Hide()
+    mini[i].num:Hide()
+  end
+  if show.week then
+    if y < -10 then y = y - 2 end
+    Put(weekLabel, true, "TOPLEFT", "TOPLEFT", PAD, y - 6)
+    local slot = ADV_W / 7
+    for i = 1, 7 do
+      local m = mini[i]
+      m.bar:ClearAllPoints()
+      m.bar:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", ADV_X + (i - 1) * slot, y - MINI_H - 4)
+      m.num:ClearAllPoints()
+      m.num:SetPoint("BOTTOMLEFT", m.bar, "BOTTOMRIGHT", 3, 0)
+    end
+    y = y - MINI_H - 8
+  end
+
   local height = -y + 8
   if height < 24 then height = 24 end
   panel:SetHeight(height)
@@ -305,6 +362,32 @@ Draw = function()
   for key, c in pairs(cells) do
     if show[key] then c.value:SetText(VALUE[key](st)) end
   end
+  if show.today then
+    local goal, n = BC.DayGoal(), BC.TodayKills()
+    if goal then
+      local part = n / goal
+      if part > 1 then part = 1 end
+      dayTrack:Show()
+      dayFill:SetWidth(math.max(1, CELL_W * part))
+      if n >= goal then dayFill:SetTexture(0.30, 0.90, 0.35, 0.9) else dayFill:SetTexture(1.00, 0.80, 0.20, 0.9) end
+      dayFill:Show()
+    end
+  end
+  if show.week then
+    local days = BC.WeekDays()
+    local top = 1
+    for i = 1, 7 do
+      if days[i].n > top then top = days[i].n end
+    end
+    for i = 1, 7 do
+      local m, d = mini[i], days[i]
+      m.bar:SetHeight(math.max(1, MINI_H * d.n / top))
+      if d.today then m.bar:SetTexture(1.00, 0.84, 0.20, 0.95) else m.bar:SetTexture(1.00, 0.66, 0.34, 0.55) end
+      m.num:SetText((d.today and GOLD or GREY) .. d.n .. END)
+      m.bar:Show()
+      m.num:Show()
+    end
+  end
 
   -- advice changes with level, zone and XP; a line that grows or shrinks moves everything under it
   local relayout = false
@@ -327,6 +410,7 @@ end
 
 function BC.Refresh()
   Draw()
+  if DrawWeek then DrawWeek() end
 end
 
 local function ShowTooltip()
@@ -418,6 +502,22 @@ local function Build()
     stripes[i]:SetTexture(1, 1, 1, 0.045)
     stripes[i]:Hide()
   end
+  dayTrack = panel:CreateTexture(nil, "BORDER")
+  dayTrack:SetTexture(1, 1, 1, 0.12)
+  dayTrack:SetWidth(CELL_W)
+  dayTrack:SetHeight(2)
+  dayFill = panel:CreateTexture(nil, "ARTWORK")
+  dayFill:SetHeight(2)
+  weekLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  weekLabel:SetTextColor(COLOURS.week.label[1], COLOURS.week.label[2], COLOURS.week.label[3])
+  weekLabel:SetText("Week")
+  for i = 1, 7 do
+    local m = {}
+    m.bar = panel:CreateTexture(nil, "ARTWORK")
+    m.bar:SetWidth(8)
+    m.num = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    mini[i] = m
+  end
   measure = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   measure:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
   measure:Hide()
@@ -426,7 +526,7 @@ local function Build()
     local it = BC.ITEMS[i]
     if it.g == "num" then
       local colour = COLOURS[it.c]
-      local c = { group = it.c }
+      local c = { group = it.c, key = it.key }
       c.label = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
       c.label:SetTextColor(colour.label[1], colour.label[2], colour.label[3])
       c.label:SetText(it.label)
@@ -499,11 +599,206 @@ function BC.SetScale(s)
 end
 
 ------------------------------------------------------------------------------------------------------
+-- The banner: big text above the middle of the screen that fades in and out. One at a time; the rest wait.
+------------------------------------------------------------------------------------------------------
+
+local banner, bannerLines
+local queue = {}         -- { title, text, foot, secs } waiting their turn
+local showing = nil      -- the one on screen, with its clock: .t
+local FADE_IN, FADE_OUT, QUEUE_MAX = 0.4, 0.8, 5
+
+local function BannerStart()
+  showing = table.remove(queue, 1)
+  if not showing then
+    banner:Hide()
+    return
+  end
+  showing.t = 0
+  -- only the lines it has, stacked from the top
+  local parts = { showing.title, showing.text, showing.foot }
+  local above = nil
+  for i = 1, 3 do
+    local fs = bannerLines[i]
+    fs:ClearAllPoints()
+    if parts[i] and parts[i] ~= "" then
+      fs:SetText(parts[i])
+      if above then
+        fs:SetPoint("TOP", above, "BOTTOM", 0, -4)
+      else
+        fs:SetPoint("TOP", banner, "TOP", 0, 0)
+      end
+      fs:Show()
+      above = fs
+    else
+      fs:SetText("")
+      fs:Hide()
+    end
+  end
+  banner:SetAlpha(0)
+  banner:Show()
+end
+
+local function BuildBanner()
+  banner = CreateFrame("Frame", "BoarChallengePlusBanner", UIParent)
+  banner:SetWidth(600)
+  banner:SetHeight(90)
+  banner:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+  banner:SetFrameStrata("HIGH")
+  banner:Hide()
+  local sizes = { 26, 18, 15 }
+  local colours = { { 1.00, 0.82, 0.00 }, { 1, 1, 1 }, { 1.00, 0.88, 0.72 } }
+  bannerLines = {}
+  for i = 1, 3 do
+    local fs = banner:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(STANDARD_TEXT_FONT, sizes[i], "OUTLINE")
+    fs:SetTextColor(colours[i][1], colours[i][2], colours[i][3])
+    fs:SetShadowOffset(1, -1)
+    bannerLines[i] = fs
+  end
+  banner:SetScript("OnUpdate", function()
+    if not showing then return end
+    showing.t = showing.t + arg1
+    local t, hold = showing.t, showing.secs
+    if t < FADE_IN then
+      banner:SetAlpha(t / FADE_IN)
+    elseif t < FADE_IN + hold then
+      banner:SetAlpha(1)
+    elseif t < FADE_IN + hold + FADE_OUT then
+      banner:SetAlpha(1 - (t - FADE_IN - hold) / FADE_OUT)
+    else
+      BannerStart()
+    end
+  end)
+end
+
+-- A banner: a big gold title, a white line, a small line under it. Any of them can be left out.
+function BC.Banner(title, text, foot, secs)
+  if (not title or title == "") and (not text or text == "") and (not foot or foot == "") then return end
+  if not banner then BuildBanner() end
+  if table.getn(queue) >= QUEUE_MAX then return end
+  table.insert(queue, { title = title, text = text, foot = foot, secs = secs or 4 })
+  if not showing then BannerStart() end
+end
+
+function BC.BannerBusy()
+  return showing ~= nil or table.getn(queue) > 0
+end
+
+------------------------------------------------------------------------------------------------------
+-- The week window: boars per day for the last 7 days, as bars, today in gold
+------------------------------------------------------------------------------------------------------
+
+local week, weekBars, weekTotal
+local WEEK_W, WEEK_H, WEEK_BASE, WEEK_TALL = 380, 260, -186, 120
+
+local function BuildWeek()
+  week = CreateFrame("Frame", "BoarChallengePlusWeek", UIParent)
+  week:SetWidth(WEEK_W)
+  week:SetHeight(WEEK_H)
+  week:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+  week:SetFrameStrata("DIALOG")
+  week:SetClampedToScreen(true)
+  week:EnableMouse(true)
+  week:SetMovable(true)
+  week:RegisterForDrag("LeftButton")
+  week:SetScript("OnDragStart", function() this:StartMoving() end)
+  week:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+  week:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  local solid = week:CreateTexture(nil, "BACKGROUND")
+  solid:SetTexture(0.05, 0.05, 0.07, 1)
+  solid:SetPoint("TOPLEFT", week, "TOPLEFT", 11, -11)
+  solid:SetPoint("BOTTOMRIGHT", week, "BOTTOMRIGHT", -11, 11)
+  week:Hide()
+  table.insert(UISpecialFrames, "BoarChallengePlusWeek")
+
+  local head = week:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+  head:SetPoint("TOP", week, "TOP", 0, -18)
+  head:SetText("Boars per day")
+  local sub = week:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  sub:SetPoint("TOP", head, "BOTTOM", 0, -3)
+  sub:SetText(GREY .. "the last 7 days, today in gold" .. END)
+  local close = CreateFrame("Button", "BoarChallengePlusWeekClose", week, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", week, "TOPRIGHT", -6, -6)
+  local credit = week:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  credit:SetPoint("BOTTOM", week, "BOTTOM", 0, 16)
+  credit:SetText(GREY .. "Made by " .. END .. "|cffabd473stealthzi" .. END .. GREY .. "   v" .. BC.VERSION .. END)
+
+  local base = week:CreateTexture(nil, "ARTWORK")
+  base:SetTexture(1, 1, 1, 0.25)
+  base:SetHeight(1)
+  base:SetPoint("TOPLEFT", week, "TOPLEFT", 26, WEEK_BASE)
+  base:SetPoint("TOPRIGHT", week, "TOPRIGHT", -26, WEEK_BASE)
+  local slot = (WEEK_W - 60) / 7
+  weekBars = {}
+  for i = 1, 7 do
+    local b = {}
+    local mid = 30 + (i - 1) * slot + slot / 2
+    b.bar = week:CreateTexture(nil, "ARTWORK")
+    b.bar:SetWidth(26)
+    b.bar:SetPoint("BOTTOM", week, "TOPLEFT", mid, WEEK_BASE)
+    b.num = week:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    b.num:SetPoint("BOTTOM", b.bar, "TOP", 0, 2)
+    b.name = week:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    b.name:SetPoint("TOP", week, "TOPLEFT", mid, WEEK_BASE - 4)
+    weekBars[i] = b
+  end
+  weekTotal = week:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+  weekTotal:SetPoint("TOP", week, "TOP", 0, WEEK_BASE - 24)
+end
+
+DrawWeek = function()
+  if not week or not week:IsShown() or not BC.char then return end
+  local days = BC.WeekDays()
+  local top, total, best = 1, 0, nil
+  for i = 1, 7 do
+    total = total + days[i].n
+    if days[i].n > top then top = days[i].n end
+    if days[i].n > 0 and (not best or days[i].n >= best.n) then best = days[i] end
+  end
+  for i = 1, 7 do
+    local b, d = weekBars[i], days[i]
+    b.bar:SetHeight(math.max(1, WEEK_TALL * d.n / top))
+    if d.today then b.bar:SetTexture(1.00, 0.84, 0.20, 0.95) else b.bar:SetTexture(1.00, 0.66, 0.34, 0.60) end
+    b.num:SetText((d.today and GOLD or WHITE) .. BC.Num(d.n) .. END)
+    b.name:SetText((d.today and GOLD or GREY) .. d.name .. END)
+  end
+  local text = "This week: " .. WHITE .. BC.Num(total) .. END .. " boars"
+  if best then text = text .. GREY .. "   best: " .. END .. WHITE .. BC.Num(best.n) .. END .. GREY .. " on " .. best.name .. END end
+  weekTotal:SetText(text)
+end
+
+function BC.ToggleWeek()
+  if not week then BuildWeek() end
+  if week:IsShown() then
+    week:Hide()
+  else
+    week:Show()
+    DrawWeek()
+  end
+end
+
+------------------------------------------------------------------------------------------------------
 -- The settings window: the numbers you already have, what the panel shows, and its size
 ------------------------------------------------------------------------------------------------------
 
-local edit, sizeText, lockCheck
-local boxes, checks = {}, {}
+local edit, sizeText, lockCheck, linesButton
+local boxes, checks, optChecks = {}, {}, {}
+-- the message switches, under Messages: key, label, what it does
+local OPTS = {
+  { key = "levelUp", label = "Level-up summary", tip = "A banner when you level: boars, time, and faster or slower than last level." },
+  { key = "milestones", label = "Milestones", tip = "A banner at 100, 250, 500, 1,000 boars and on." },
+  { key = "records", label = "Records", tip = "NEW RECORD! with a sound when you beat your best. /boar records lists them." },
+  { key = "goal", label = "Daily goal", tip = "A banner when you beat yesterday and when you reach the day's goal. /boar goal 200 sets one." },
+  { key = "deathNotes", label = "Death notes", tip = "Notes where you died and what hit you last. /boar deaths lists them." },
+  { key = "streaks", label = "Streak messages", tip = "A banner at 5, 10, 25, 50 and 100 boars in a row." },
+}
+local LINES_NAME = { off = "Off", rare = "Rare", normal = "Normal" }
+local LINES_NEXT = { off = "rare", rare = "normal", normal = "off" }
 local filled = {}        -- what each box was filled with, so an untouched box changes nothing
 local FIELDS = {
   { key = "kills", label = "Boars killed", tip = "All your boar kills." },
@@ -537,6 +832,8 @@ function BC.FillEdit()
   filled.boarXP, filled.otherXP = tostring(c.boarXP), tostring(c.otherXP)
   for key, text in pairs(filled) do boxes[key]:SetText(text) end
   for key, check in pairs(checks) do check:SetChecked(c.show[key] and 1 or nil) end
+  for key, check in pairs(optChecks) do check:SetChecked(c.opt[key] and 1 or nil) end
+  linesButton:SetText("Funny lines: " .. (LINES_NAME[c.opt.lines] or "Rare"))
   sizeText:SetText("Size " .. math.floor((BC.db.scale or 1) * 100 + 0.5) .. "%")
   lockCheck:SetChecked(BC.db.locked and 1 or nil)
 end
@@ -588,8 +885,8 @@ local resetClicks = 0
 local function BuildEdit()
   edit = CreateFrame("Frame", "BoarChallengePlusEdit", UIParent)
   edit:SetWidth(600)
-  edit:SetHeight(560)
-  edit:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
+  edit:SetHeight(710)
+  edit:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   edit:SetFrameStrata("DIALOG")
   edit:SetClampedToScreen(true)
   edit:EnableMouse(true)
@@ -654,18 +951,26 @@ local function BuildEdit()
   end)
 
   Heading("Top", 24, -188, true)
-  Heading("Advice", 24, -364, true)
+  Heading("Advice and chart", 24, -364, true)
   Heading("Numbers", 214, -188, true)
-  local topRow, adviceRow, numRow = 0, 0, 0
+  Heading("Today", 214, -430, true)
+  Heading("Records", 404, -390, true)
+  local topRow, adviceRow, numRow, dayRow, recordRow = 0, 0, 0, 0, 0
   for i = 1, table.getn(BC.ITEMS) do
     local it = BC.ITEMS[i]
     local x, y
     if it.g == "top" then
       x, y = 22, -202 - topRow * 20
       topRow = topRow + 1
-    elseif it.g == "advice" then
+    elseif it.g == "advice" or it.g == "chart" then
       x, y = 22, -378 - adviceRow * 20
       adviceRow = adviceRow + 1
+    elseif it.c == "day" then
+      x, y = 212, -444 - dayRow * 20
+      dayRow = dayRow + 1
+    elseif it.c == "records" then
+      x, y = 402, -404 - recordRow * 20
+      recordRow = recordRow + 1
     else
       x, y = 212 + math.floor(numRow / 11) * 190, -202 - math.mod(numRow, 11) * 20
       numRow = numRow + 1
@@ -675,7 +980,7 @@ local function BuildEdit()
     check:SetWidth(20)
     check:SetHeight(20)
     check:SetPoint("TOPLEFT", edit, "TOPLEFT", x, y)
-    getglobal(name .. "Text"):SetText(it.label)
+    getglobal(name .. "Text"):SetText(it.long or it.label)
     local tint = COLOURS[it.c or it.key]
     if tint then getglobal(name .. "Text"):SetTextColor(tint.label[1], tint.label[2], tint.label[3]) end
     check.key = it.key
@@ -687,10 +992,41 @@ local function BuildEdit()
     checks[it.key] = check
   end
 
+  -- the messages: funny lines, banners, records, death notes
+  Heading("Messages", 24, -512)
+  local hint2 = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  hint2:SetPoint("TOPLEFT", edit, "TOPLEFT", 112, -514)
+  hint2:SetText(GREY .. "banners on screen, and a line in chat" .. END)
+  linesButton = Button("BoarChallengePlusEditLines", "Funny lines: Rare", 160)
+  linesButton:SetPoint("TOPLEFT", edit, "TOPLEFT", 24, -532)
+  Explain(linesButton, "Funny lines", "Click to change: Off, Rare (about every 15 min) or Normal (about every 7 min) while you kill. Also on level-ups, deaths, milestones and records.")
+  linesButton:SetScript("OnClick", function()
+    BC.SetLines(LINES_NEXT[BC.char.opt.lines] or "rare")
+    BC.FillEdit()
+  end)
+  -- three to a line: after the button on the first, then two full lines
+  local spots = { { 212, -533 }, { 402, -533 }, { 22, -558 }, { 212, -558 }, { 402, -558 }, { 22, -583 } }
+  for i = 1, table.getn(OPTS) do
+    local o = OPTS[i]
+    local name = "BoarChallengePlusOpt" .. o.key
+    local check = CreateFrame("CheckButton", name, edit, "UICheckButtonTemplate")
+    check:SetWidth(20)
+    check:SetHeight(20)
+    check:SetPoint("TOPLEFT", edit, "TOPLEFT", spots[i][1], spots[i][2])
+    getglobal(name .. "Text"):SetText(o.label)
+    check.key = o.key
+    check:SetScript("OnClick", function() BC.char.opt[this.key] = this:GetChecked() and true or false end)
+    Explain(check, o.label, o.tip)
+    optChecks[o.key] = check
+  end
+  local weekButton = Button("BoarChallengePlusEditWeek", "Week chart", 120, "Boars per day, last 7 days. Also /boar week.")
+  weekButton:SetPoint("TOPLEFT", edit, "TOPLEFT", 212, -582)
+  weekButton:SetScript("OnClick", function() BC.ToggleWeek() end)
+
   -- size and lock
-  Heading("Size", 24, -470)
+  Heading("Size", 24, -620)
   local smaller = Button("BoarChallengePlusEditSmaller", "-", 26, "Smaller panel.")
-  smaller:SetPoint("TOPLEFT", edit, "TOPLEFT", 64, -466)
+  smaller:SetPoint("TOPLEFT", edit, "TOPLEFT", 64, -616)
   smaller:SetScript("OnClick", function() BC.SetScale((BC.db.scale or 1) - 0.1) end)
   sizeText = edit:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
   sizeText:SetPoint("LEFT", smaller, "RIGHT", 8, 0)
@@ -701,7 +1037,7 @@ local function BuildEdit()
   lockCheck = CreateFrame("CheckButton", "BoarChallengePlusEditLock", edit, "UICheckButtonTemplate")
   lockCheck:SetWidth(20)
   lockCheck:SetHeight(20)
-  lockCheck:SetPoint("TOPLEFT", edit, "TOPLEFT", 290, -467)
+  lockCheck:SetPoint("TOPLEFT", edit, "TOPLEFT", 290, -617)
   getglobal("BoarChallengePlusEditLockText"):SetText("Locked (Shift-drag still moves it)")
   lockCheck:SetScript("OnClick", function() BC.db.locked = this:GetChecked() and true or false end)
   Explain(lockCheck, "Locked", "Only moves with Shift held down.")
