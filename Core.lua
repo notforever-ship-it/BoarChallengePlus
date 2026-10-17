@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.4.6"
+BC.VERSION = "1.4.7"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -282,8 +282,6 @@ function BC.Stats()
     st.paceFromLast = true
   end
   st.secondsToLevel = (rate > 0) and (left / rate * 3600) or nil
-  local total = c.boarXP + c.otherXP
-  st.boarShare = (total > 0) and math.floor(c.boarXP / total * 100 + 0.5) or nil
   -- the extra rows
   st.thisLevelKills = c.byLevel[st.level] or 0
   local n = table.getn(c.levels)

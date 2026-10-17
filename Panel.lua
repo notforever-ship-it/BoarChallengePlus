@@ -47,7 +47,6 @@ BC.ITEMS = {
   { g = "num", c = "xp", key = "xpLeft", label = "XP to level", on = false, tip = "XP left to the next level." },
   { g = "num", c = "xp", key = "sessionXP", label = "XP this session", on = false, tip = "XP gained this session." },
   { g = "num", c = "xp", key = "best", label = "Best XP per hour", on = false, tip = "Your best session rate (after 10 minutes)." },
-  { g = "num", c = "xp", key = "boarShare", label = "XP from boars", on = false, tip = "Share of your XP from boars." },
   { g = "num", c = "time", key = "pace", label = "Time to level", on = true, tip = "Time to next level at your recent pace." },
   { g = "num", c = "time", key = "played", label = "Time played", on = true, tip = "Time on the challenge. Stops while AFK." },
   { g = "num", c = "time", key = "sessionPlayed", label = "Played this session", on = false, tip = "Time played this session." },
@@ -100,7 +99,6 @@ local VALUE = {
     local n = BC.BoarsTo60 and BC.BoarsTo60(st.level)
     return n and ("~" .. BC.Num(n)) or DASH
   end,
-  boarShare = function(st) return st.boarShare and (st.boarShare .. "%") or DASH end,
   best = function(st) return Rate(st.bestXPHour) end,
 }
 

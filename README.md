@@ -43,7 +43,7 @@ Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 - **Top**: title, name, boars to level, boars killed, XP bar, bar numbers, rested, background.
 - **Advice**: here, now, next, later.
 - **Boars**: killed, per hour, this session, this level, last 30 min, last level, to 60.
-- **XP**: per hour, per boar, last 30 min, to level, this session, best per hour, share from boars.
+- **XP**: per hour, per boar, last 30 min, to level, this session, best per hour.
 - **Time**: to level, played, this session, last level.
 - **Other**: rested XP, boars on rested, deaths.
 - **Size**: smaller and bigger buttons, or `/boar scale 1.2`.
