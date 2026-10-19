@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.5.0"
+BC.VERSION = "1.6.0"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -138,6 +138,14 @@ local function InitDB()
   end
   if c.goal ~= nil and (type(c.goal) ~= "number" or c.goal < 1) then c.goal = nil end   -- nil: beat yesterday
   if type(c.deathLog) ~= "table" then c.deathLog = {} end
+  -- 1.6.0: the boar list and the dots on the world map
+  if type(c.mapBoars) ~= "table" then c.mapBoars = {} end              -- ["Mottled Boar|Durotar"] = true: on the map
+  for k, v in pairs(c.mapBoars) do
+    if type(k) ~= "string" or v ~= true then c.mapBoars[k] = nil end
+  end
+  if type(c.opt.mapDots) ~= "boolean" then c.opt.mapDots = true end          -- the dots at all
+  if type(c.opt.mapColours) ~= "boolean" then c.opt.mapColours = true end    -- off: all one colour
+  if type(c.opt.listXPOnly) ~= "boolean" then c.opt.listXPOnly = false end   -- the list without grey boars
   if type(BC.db.seen) ~= "table" then BC.db.seen = {} end              -- funny lines shown lately, per kind
   if type(BC.db.lastLine) ~= "table" then BC.db.lastLine = {} end
   BC.char = c
@@ -213,14 +221,19 @@ function BC.SetLines(mode)
   nextLineAt = nil
 end
 
+-- A day runs from 6 in the morning to 6 the next morning, so a late night counts with the evening it
+-- started in. Times are moved back 6 hours before reading the date.
+local DAY_START = 6 * 3600
+
 -- "2026-10-17", by this PC's clock.
 function BC.Today()
-  return date("%Y-%m-%d")
+  return date("%Y-%m-%d", time() - DAY_START)
 end
 
--- Noon, so many days ago: counting back from noon, a clock change in the night can't skip a day.
+-- Noon, so many days ago (moved back 6 hours like above): counting back from noon, a clock change in the
+-- night can't skip a day.
 local function Noon(back)
-  local now = time()
+  local now = time() - DAY_START
   local secs = tonumber(date("%H", now)) * 3600 + tonumber(date("%M", now)) * 60 + tonumber(date("%S", now))
   return now - secs + 43200 - back * 86400
 end
@@ -749,6 +762,8 @@ function BC.ResetAll()
   InitDB()
   StartClocks()
   BC.ResetSession()
+  if BC.DrawList then BC.DrawList() end
+  if BC.MapChanged then BC.MapChanged() end
   BC.Print(RED .. "everything for this character is back to zero." .. END)
 end
 
@@ -892,10 +907,11 @@ local function Help()
     "/boar where" .. GREY .. "  boars here, and where next" .. END,
     "/boar route" .. GREY .. "  your road to 60" .. END,
     "/boar route all" .. GREY .. "  every boar known" .. END,
+    "/boar list" .. GREY .. "  boar list; tick boars to see them on the map" .. END,
     GOLD .. "Boars" .. END,
     "/boar add <name>" .. GREY .. "  count it as a boar" .. END,
     "/boar remove <name>" .. GREY .. "  stop counting it" .. END,
-    "/boar list" .. GREY .. "  boars killed, by kind" .. END,
+    "/boar kinds" .. GREY .. "  boars killed, by kind" .. END,
     "/boar levels" .. GREY .. "  each level's boars and time" .. END,
     GOLD .. "Goals and records" .. END,
     "/boar goal 200" .. GREY .. "  daily goal; auto = beat yesterday" .. END,
@@ -968,7 +984,9 @@ local function Slash(msg)
       for i = 1, table.getn(BC.ITEMS or {}) do table.insert(keys, BC.ITEMS[i].key) end
       BC.Print("things on the panel: " .. table.concat(keys, ", ") .. ". " .. GOLD .. "/boar show <thing>" .. END .. " switches one.")
     end
-  elseif word == "list" then
+  elseif word == "list" or word == "boars" then
+    if BC.ToggleList then BC.ToggleList() end
+  elseif word == "kinds" or word == "killed" then
     ListNames()
   elseif word == "levels" then
     ListLevels()

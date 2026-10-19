@@ -37,6 +37,7 @@ Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 - **Later**: the stops after that (off at first).
 - **Today**: boars today and the day's goal, with a thin bar that fills toward it. Green when reached.
 - **Yday**: boars yesterday.
+- A day starts at 6 in the morning, so a late night counts with the evening before.
 - **Streak**: boars in a row, your best in brackets.
 - **Week chart**: 7 small bars under the panel, today in gold (off at first).
 
@@ -55,6 +56,7 @@ Next   At 22: Hillsbrad Foothills, Forest Boar 23-25
 - **Records**: best level pace, best hour, best day (off at first).
 - **Messages**: funny lines (Off, Rare, Normal), level-up summary, milestones, records, daily goal, death notes, streak messages.
 - **Week chart** button: the big chart.
+- **Boar list** button: every boar, and dots on the map.
 - **Size**: smaller and bigger buttons, or `/boar scale 1.2`.
 - **Lock**: then it only moves with Shift.
 - **Defaults**: panel back to how it starts.
@@ -103,6 +105,23 @@ From Westfall at level 18:
 | 46 to 58 | Blasted Lands | Ashmane Boar 48-49, Helboar 52-53 | |
 | 58 to 60 | Eastern Plaguelands | Plagued Swine 60 | |
 
+## Boar list and map dots
+
+- `/boar list`, or the **Boar list** button in settings.
+- Every boar by zone, lowest zone first.
+- Each boar: levels in the game's colour, area, map spot, spawns.
+- **Tick a boar**: its spawn points show as dots on the world map.
+- **Tick a zone**: all its boars on the map.
+- **Click a name**: the map opens on that zone, dots on.
+- **Only boars that give me XP**: hides the grey ones.
+- **Boar dots on the map**: all dots on or off.
+- **Colour dots by level**: off = all dots boar orange.
+- **Clear map**: unticks every boar.
+- Colours: grey = no XP, then green, yellow, orange, red.
+- With pfQuest: a dot for every spawn point. Without: one bigger dot per boar.
+- Hover a dot: boar, levels, area.
+- Saved per character.
+
 ## Boar data
 
 - With **pfQuest** (pfQuest-turtle, pfQuest-octo): boars come from its database, server zones included.
@@ -133,12 +152,13 @@ From Westfall at level 18:
 | `/boar where` | Boars here, now, next and later |
 | `/boar route` | Road to 60: stops, boars, map positions, boar counts |
 | `/boar route all` | Every boar known, low to high |
+| `/boar list` | Boar list window; tick boars to see them on the map |
 | `/boar show <thing>` | One thing on or off; `/boar show` lists them |
 | `/boar scale 1.2` | Panel size, 0.6 to 2 |
 | `/boar set kills 1000` | Set `kills`, `deaths`, `played`, `xp` (boars) or `otherxp` |
 | `/boar add <name>` | Count it as a boar (no name: your target) |
 | `/boar remove <name>` | Stop counting it |
-| `/boar list` | Boars killed, by kind |
+| `/boar kinds` | Boars killed, by kind |
 | `/boar levels` | Each level with its boars and time |
 | `/boar goal 200` | Daily goal; `/boar goal auto` = beat yesterday; `/boar goal` shows it |
 | `/boar days` | Boars per day, last 14 days |

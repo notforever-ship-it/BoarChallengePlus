@@ -30,6 +30,7 @@ local LANDS = {  -- the rest of each faction's own lands
   ["The Barrens"] = "Horde", ["Silverpine Forest"] = "Horde",
 }
 local COLOUR = { grey = "|cff9d9d9d", green = "|cff40ff40", yellow = "|cffffff40", orange = "|cffff8000", red = "|cffff4040" }
+BC.COLOUR = COLOUR
 
 local STAY = 1.3    -- a zone with bigger boars must be this much better before the road moves you on
 local ALSO = 0.55   -- zones with boars as big, and at least this good, are named as well
@@ -138,7 +139,8 @@ local function IsBoarName(name)
 end
 
 ------------------------------------------------------------------------------------------------------
--- Rows: { name, lo, hi, zone, area, x, y, spawns }
+-- Rows: { name, lo, hi, zone, area, x, y, spawns, points }
+-- points: pfQuest's spawn points on that map (live rows only; the built-in list has none)
 ------------------------------------------------------------------------------------------------------
 
 local live = nil          -- rows from pfQuest's database, built once
@@ -197,7 +199,8 @@ local function LiveRows()
                 if not best or d < best then bx, by, best = p[1], p[2], d end
               end
               bx, by = math.floor(bx + 0.5), math.floor(by + 0.5)
-              table.insert(live, { name, lo, hi, zoneNames[map] or ("map " .. map), AreaAt(map, bx, by) or false, bx, by, m.n })
+              -- the 9th field: every spawn point on this map, { x, y, map, respawn }, for the dots on the world map
+              table.insert(live, { name, lo, hi, zoneNames[map] or ("map " .. map), AreaAt(map, bx, by) or false, bx, by, m.n, m.pts })
             end
           end
         end

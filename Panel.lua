@@ -36,7 +36,7 @@ BC.ITEMS = {
   { g = "chart", key = "week", label = "Week chart", on = false, tip = "Small bars under the panel: boars per day, last 7 days. Big one: /boar week." },
 
   -- the numbers, in colour groups: today gold, boars orange, XP purple, time blue, rested green, deaths red, records pink
-  { g = "num", c = "day", key = "today", label = "Today", on = true, tip = "Boars today, and the day's goal. The bar fills toward the goal." },
+  { g = "num", c = "day", key = "today", label = "Today", on = true, tip = "Boars today, and the day's goal. The bar fills toward the goal. A day starts at 6 am." },
   { g = "num", c = "day", key = "yesterday", label = "Yday", long = "Yesterday", on = true, tip = "Boars yesterday." },
   { g = "num", c = "day", key = "streak", label = "Streak", on = true, tip = "Boars in a row with no break, and your best in brackets. A wait over 90 seconds, eating, drinking, AFK or dying ends it." },
   { g = "num", c = "boars", key = "kills", label = "Boars killed", on = false, tip = "All your boar kills." },
@@ -1022,6 +1022,9 @@ local function BuildEdit()
   local weekButton = Button("BoarChallengePlusEditWeek", "Week chart", 120, "Boars per day, last 7 days. Also /boar week.")
   weekButton:SetPoint("TOPLEFT", edit, "TOPLEFT", 212, -582)
   weekButton:SetScript("OnClick", function() BC.ToggleWeek() end)
+  local listButton = Button("BoarChallengePlusEditList", "Boar list", 120, "Every boar, by zone. Tick them to see them on the world map. Also /boar list.")
+  listButton:SetPoint("LEFT", weekButton, "RIGHT", 8, 0)
+  listButton:SetScript("OnClick", function() if BC.ToggleList then BC.ToggleList() end end)
 
   -- size and lock
   Heading("Size", 24, -620)
