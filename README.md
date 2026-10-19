@@ -1,6 +1,6 @@
 # Boar Challenge +
 
-For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Ravencraft, OctoWoW).
+For a character that levels on boars alone, on the 1.12 client: plain vanilla WoW servers, Turtle WoW, OctoWoW and Ravencraft.
 
 - A panel with the numbers that matter for the run.
 - Every number can be switched off.
@@ -146,6 +146,7 @@ From Westfall at level 18:
 
 - With **pfQuest** (pfQuest-turtle, pfQuest-octo): boars come from its database, server zones included.
 - Without it: a built-in list from that database (2026-09-25, vanilla plus Turtle WoW).
+- On a plain vanilla server the built-in list leaves out Turtle WoW's own zones, so the road only uses zones you have.
 - OctoWoW shows the same boars at the same levels.
 - Boars on a zone's edge are kept in the zone they are really in.
 

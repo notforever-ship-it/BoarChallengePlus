@@ -251,9 +251,41 @@ end
 local cleaned, cleanedFrom = nil, nil
 local byZone, byZoneFrom = nil, nil
 
+-- The built-in list holds Turtle WoW's own zones too. On a server whose world map has none of them (plain
+-- vanilla), their rows are left out, so the road never sends you to a zone that is not there.
+local TURTLE_ZONES = { "Northwind", "Grim Reaches", "Gilneas", "Thalassian Highlands", "Alah'Thalas" }
+local onServer
+local function BuiltInRows()
+  if onServer then return onServer end
+  local known, any = {}, false
+  local conts = { GetMapContinents() }
+  for cont = 1, table.getn(conts) do
+    local zones = { GetMapZones(cont) }
+    for i = 1, table.getn(zones) do
+      known[zones[i]] = true
+      any = true
+    end
+  end
+  if not any then return BC.BOARS end      -- map list not ready yet: try again next time
+  local turtle = {}
+  for i = 1, table.getn(TURTLE_ZONES) do
+    if known[TURTLE_ZONES[i]] then
+      onServer = BC.BOARS                  -- a server with the new zones: keep everything
+      return onServer
+    end
+    turtle[TURTLE_ZONES[i]] = true
+  end
+  onServer = {}
+  for i = 1, table.getn(BC.BOARS) do
+    local r = BC.BOARS[i]
+    if not turtle[r[4]] and not string.find(r[1], "Thalassian") then table.insert(onServer, r) end
+  end
+  return onServer
+end
+
 -- Every boar known, cleaned up, one row per boar and zone.
 function BC.BoarRows()
-  local src = LiveRows() or BC.BOARS
+  local src = LiveRows() or BuiltInRows()
   if cleanedFrom ~= src then
     cleaned = Clean(src)
     cleanedFrom = src
