@@ -5,6 +5,7 @@ For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Rave
 - A panel with the numbers that matter for the run.
 - Every number can be switched off.
 - A road of boar zones from your level to 60.
+- Boar hunters Discord: https://discord.gg/J9uvxmYWxy
 
 ## Start
 
@@ -110,15 +111,16 @@ From Westfall at level 18:
 - `/boar list`, or the **Boar list** button in settings.
 - Every boar by zone, lowest zone first.
 - Each boar: levels in the game's colour, area, map spot, spawns.
-- **Tick a boar**: its spawn points show as dots on the world map.
+- **Tick a boar**: its spawn points show as dots on the world map (and the minimap with pfQuest).
 - **Tick a zone**: all its boars on the map.
 - **Click a name**: the map opens on that zone, dots on.
-- **Only boars that give me XP**: hides the grey ones.
+- **Only boars that give me XP**: hides the grey ones, in the list and on the map. Follows you as you level.
 - **Boar dots on the map**: all dots on or off.
 - **Colour dots by level**: off = all dots boar orange.
 - **Clear map**: unticks every boar.
+- **Tick all**: ticks every boar in the list.
 - Colours: grey = no XP, then green, yellow, orange, red.
-- With pfQuest: a dot for every spawn point. Without: one bigger dot per boar.
+- With pfQuest: a dot for every spawn point, on the world map and the minimap. Without: one bigger dot per boar, world map only.
 - Hover a dot: boar, levels, area.
 - Saved per character.
 

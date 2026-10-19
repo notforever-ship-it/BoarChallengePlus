@@ -45,7 +45,7 @@ const KNOWN_GLOBALS = new Set((
   "UnitXP UnitXPMax UnitIsAFK BoaringChallengeDB GetXPExhaustion UnitFactionGroup pfDB " +
   // Boar list: the world map, and pfQuest's map helpers
   "GetCurrentMapContinent GetCurrentMapZone GetMapContinents GetMapZones SetMapZoom ShowUIPanel " +
-  "WorldMapButton WorldMapTooltip pfMap " +
+  "WorldMapButton WorldMapTooltip pfMap pfQuestConfig " +
   "GetNumQuestLogEntries GetQuestLogTitle ExpandQuestHeader CollapseQuestHeader GetNumQuestLeaderBoards GetQuestLogLeaderBoard " +
   "GetQuestLogSelection AcceptQuest GetQuestReward GetTitleText SetMapToCurrentZone GetPlayerMapPosition WorldMapFrame " +
   "GetSubZoneText UnitRace pfDatabase pfDB QuestLogFrame QuestLog_Update QuestLog_SetSelection SelectQuestLogEntry GetQuestLogQuestText " +

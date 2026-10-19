@@ -3,7 +3,8 @@
 -- The list shows every boar known (pfQuest's database, or the built-in list), grouped by zone, lowest
 -- zone first. Tick a boar, or a whole zone, and its spawn points show as small dots on the world map,
 -- coloured the way the game colours that boar for you. Click a boar's name to open the map there.
--- The dots are our own, not pfQuest's: pfQuest picks its pin colours itself, so we could not colour them.
+-- With pfQuest the dots are pfQuest pins in our colours, so they show on the minimap too. Without it the
+-- dots are our own, on the world map only.
 
 local BC = BoarChallengePlus
 local GOLD, GREY, WHITE, RED, GREEN, END = BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END
@@ -28,6 +29,13 @@ local drawnLevel = nil
 
 local function Key(r)
   return r[1] .. "|" .. r[4]
+end
+
+-- A boar whose dots show: ticked, and not grey when "Only boars that give me XP" is on (so the dots
+-- follow you as you level).
+local function Wanted(r, c, grey)
+  if not c.mapBoars[Key(r)] then return false end
+  return not (c.opt.listXPOnly and r[3] <= grey)
 end
 
 local function Levels(r)
@@ -55,6 +63,7 @@ end
 ------------------------------------------------------------------------------------------------------
 
 local dots, pins = nil, {}
+local PfReady
 local dotsDirty, dotsKey, dotsTick = true, nil, 0
 local zoneCache = {}              -- [continent] = { GetMapZones(continent) }
 
@@ -111,6 +120,46 @@ local function Place(i, x, y, size, rgb, r, w, h)
   p:Show()
 end
 
+------------------------------------------------------------------------------------------------------
+-- pfQuest pins: world map and minimap
+------------------------------------------------------------------------------------------------------
+
+-- pfQuest keeps a pin's first colour for good, so each colour gets its own pin group, and a new colour
+-- (after a level-up) makes a new pin instead of keeping the old one.
+local PF = "BOARCHALLENGE"
+local PF_GROUPS = { "grey", "green", "yellow", "orange", "red", "plain" }
+
+PfReady = function()
+  return pfMap and pfMap.AddNode and pfMap.DeleteNode and pfQuestConfig and pfQuestConfig.path
+    and BC.RowsAreLive() and true or false
+end
+
+local function SyncPf()
+  if not PfReady() then return end
+  for i = 1, table.getn(PF_GROUPS) do pfMap:DeleteNode(PF .. PF_GROUPS[i]) end
+  local c = BC.char
+  if c and c.opt.mapDots then
+    local tex = pfQuestConfig.path .. "\\img\\node"
+    local grey = BC.GreyLevel(UnitLevel("player") or 1)
+    local src = BC.BoarRows()
+    for i = 1, table.getn(src) do
+      local r = src[i]
+      if type(r[9]) == "table" and Wanted(r, c, grey) then
+        local group = c.opt.mapColours and ColourOf(r) or "plain"
+        local rgb = (group == "plain") and BOAR_RGB or RGB[group]
+        for j = 1, table.getn(r[9]) do
+          local pt = r[9][j]
+          if pt[3] then
+            pfMap:AddNode({ addon = PF .. group, zone = pt[3], x = pt[1], y = pt[2], title = r[1], spawn = r[1],
+              spawntype = "Unit", level = Levels(r), texture = tex, vertex = rgb })
+          end
+        end
+      end
+    end
+  end
+  if pfMap.UpdateNodes then pfMap:UpdateNodes() end
+end
+
 -- Every ticked boar of the zone on the map: a dot at each spawn point (live data), or one bigger dot
 -- at its spot (the built-in list).
 local function DrawDots()
@@ -118,12 +167,13 @@ local function DrawDots()
   local used = 0
   local c = BC.char
   local zone = ShownZone()
-  if c and c.opt.mapDots and zone then
+  if c and c.opt.mapDots and zone and not PfReady() then
     local w, h = WorldMapButton:GetWidth(), WorldMapButton:GetHeight()
+    local grey = BC.GreyLevel(UnitLevel("player") or 1)
     local src = BC.BoarRows()
     for i = 1, table.getn(src) do
       local r = src[i]
-      if r[4] == zone and c.mapBoars[Key(r)] then
+      if r[4] == zone and Wanted(r, c, grey) then
         local rgb = c.opt.mapColours and RGB[ColourOf(r)] or BOAR_RGB
         if type(r[9]) == "table" then
           for j = 1, table.getn(r[9]) do
@@ -145,6 +195,7 @@ end
 -- Something changed (a tick, an option): the dots are drawn again the next time the map is looked at.
 function BC.MapChanged()
   dotsDirty = true
+  SyncPf()
   if dots and dots:IsVisible() then DrawDots() end
 end
 
@@ -249,8 +300,15 @@ local DrawList
 local function FillRows()
   if not list or not list:IsShown() then return end
   local total = table.getn(data)
+  -- the list got shorter (e.g. "Only boars that give me XP") while scrolled down: move back up, or it shows empty
+  local offset = FauxScrollFrame_GetOffset(scroll) or 0
+  if offset > 0 and offset > total - ROWS then
+    offset = (total > ROWS) and (total - ROWS) or 0
+    scroll.offset = offset
+    getglobal(scroll:GetName() .. "ScrollBar"):SetValue(offset * ROW_H)
+  end
   FauxScrollFrame_Update(scroll, total, ROWS, ROW_H)
-  local offset = FauxScrollFrame_GetOffset(scroll)
+  offset = FauxScrollFrame_GetOffset(scroll) or 0
   local m = BC.char.mapBoars
   for i = 1, ROWS do
     local f = rows[i]
@@ -437,7 +495,7 @@ local function BuildList()
   head:SetText("Boar list")
   local sub = list:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   sub:SetPoint("TOP", head, "BOTTOM", 0, -3)
-  sub:SetText(GREY .. "tick a boar to see it on the world map" .. END)
+  sub:SetText(GREY .. "tick a boar to see it on the world map" .. (PfReady() and " and the minimap" or "") .. END)
   local close = CreateFrame("Button", "BoarChallengePlusListClose", list, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", list, "TOPRIGHT", -6, -6)
   local credit = list:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -445,17 +503,30 @@ local function BuildList()
   credit:SetText(GREY .. "Made by " .. END .. "|cffabd473stealthzi" .. END .. GREY .. "   v" .. BC.VERSION .. END)
 
   -- the switches, two to a line, and Clear map
-  TopCheck("listXPOnly", "Only boars that give me XP", "Hides the grey boars: no XP at your level.", 20, -56)
+  TopCheck("listXPOnly", "Only boars that give me XP", "Hides the grey boars (no XP at your level), in the list and on the map. Follows you as you level.", 20, -56)
   TopCheck("mapDots", "Boar dots on the map", "Dots on the world map for every boar you ticked.", 250, -56)
   TopCheck("mapColours", "Colour dots by level", "Off: every dot the same boar orange.", 20, -78)
   local clear = CreateFrame("Button", "BoarChallengePlusListClear", list, "UIPanelButtonTemplate")
-  clear:SetWidth(100)
+  clear:SetWidth(96)
   clear:SetHeight(22)
   clear:SetPoint("TOPLEFT", list, "TOPLEFT", 252, -78)
   clear:SetText("Clear map")
   Explain(clear, "Clear map", "Unticks every boar. The dots go.")
   clear:SetScript("OnClick", function()
     BC.char.mapBoars = {}
+    DrawList()
+    BC.MapChanged()
+  end)
+  local all = CreateFrame("Button", "BoarChallengePlusListAll", list, "UIPanelButtonTemplate")
+  all:SetWidth(96)
+  all:SetHeight(22)
+  all:SetPoint("LEFT", clear, "RIGHT", 4, 0)
+  all:SetText("Tick all")
+  Explain(all, "Tick all", "Ticks every boar in the list: dots for all of them.")
+  all:SetScript("OnClick", function()
+    for i = 1, table.getn(data) do
+      if data[i].kind == "boar" then BC.char.mapBoars[Key(data[i].row)] = true end
+    end
     DrawList()
     BC.MapChanged()
   end)
@@ -501,15 +572,18 @@ function BC.ToggleList()
 end
 
 -- The dots are ready from login, so ticks from last time show the first time the map opens.
-local seenLevel = nil
+local seenLevel, pfDone = nil, nil
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_LEVEL_UP")
 events:RegisterEvent("PLAYER_XP_UPDATE")
 events:SetScript("OnEvent", function()
   if event == "PLAYER_LOGIN" then
     BuildDots()
     seenLevel = UnitLevel("player")
+  elseif event == "PLAYER_ENTERING_WORLD" then
+    if not pfDone then pfDone = true SyncPf() end   -- last time's ticks on the minimap straight away
   elseif UnitLevel("player") ~= seenLevel then
     -- a new level changes the colours (and the grey boars); the game can be a moment late with it,
     -- so the XP update after a level-up looks again

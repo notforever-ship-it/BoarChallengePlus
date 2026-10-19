@@ -2,7 +2,7 @@
 ## Title: Boar Challenge +
 ## Notes: Level on boars alone: boars to level, XP and boars per hour, time played, road of boar zones to 60. /boar
 ## Author: stealthzi
-## Version: 1.6.1
+## Version: 1.6.2
 ## SavedVariables: BoarChallengePlusDB
 ## SavedVariablesPerCharacter: BoarChallengePlusCharDB
 
