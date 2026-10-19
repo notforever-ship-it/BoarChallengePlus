@@ -7,6 +7,24 @@ For a character that levels on boars alone, on the 1.12 client (Turtle WoW, Rave
 - A road of boar zones from your level to 60.
 - Boar hunters Discord: https://discord.gg/J9uvxmYWxy
 
+## Screenshots
+
+The panel:
+
+![The panel](screenshots/panel.webp)
+
+Settings:
+
+![Settings](screenshots/settings.webp)
+
+Boar list:
+
+![Boar list](screenshots/boar-list.png)
+
+Boar dots on the world map:
+
+![Boar dots on the map](screenshots/map-dots.webp)
+
 ## Start
 
 - Type `/boar` to show or hide the panel.
