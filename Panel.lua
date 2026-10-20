@@ -1023,7 +1023,7 @@ local function BuildEdit()
   local weekButton = Button("BoarChallengePlusEditWeek", "Week chart", 120, "Boars per day, last 7 days. Also /boar week.")
   weekButton:SetPoint("TOPLEFT", edit, "TOPLEFT", 212, -582)
   weekButton:SetScript("OnClick", function() BC.ToggleWeek() end)
-  local listButton = Button("BoarChallengePlusEditList", "Boar list", 120, "Every boar, by zone. Tick them to see them on the world map. Also /boar list.")
+  local listButton = Button("BoarChallengePlusEditList", "Boar list", 120, "Every boar, by zone, and which ones get dots on the world map. Also /boar list.")
   listButton:SetPoint("LEFT", weekButton, "RIGHT", 8, 0)
   listButton:SetScript("OnClick", function() if BC.ToggleList then BC.ToggleList() end end)
 

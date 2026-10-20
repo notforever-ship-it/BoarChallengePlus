@@ -9,7 +9,7 @@
 
 BoarChallengePlus = {}
 local BC = BoarChallengePlus
-BC.VERSION = "1.6.3"
+BC.VERSION = "1.6.4"
 
 local GOLD, GREY, WHITE, RED, GREEN, END = "|cffffd100", "|cff9d9d9d", "|cffffffff", "|cffff4040", "|cff40ff40", "|r"
 BC.GOLD, BC.GREY, BC.WHITE, BC.RED, BC.GREEN, BC.END = GOLD, GREY, WHITE, RED, GREEN, END
@@ -146,6 +146,10 @@ local function InitDB()
   if type(c.opt.mapDots) ~= "boolean" then c.opt.mapDots = true end          -- the dots at all
   if type(c.opt.mapColours) ~= "boolean" then c.opt.mapColours = true end    -- off: all one colour
   if type(c.opt.listXPOnly) ~= "boolean" then c.opt.listXPOnly = false end   -- the list without grey boars
+  -- 1.6.4: one choice instead of ticks: dots for the boars that give XP, all boars, or none
+  if c.opt.mapShow ~= "xp" and c.opt.mapShow ~= "all" and c.opt.mapShow ~= "off" then
+    c.opt.mapShow = (c.opt.mapDots == false) and "off" or "xp"
+  end
   if type(BC.db.seen) ~= "table" then BC.db.seen = {} end              -- funny lines shown lately, per kind
   if type(BC.db.lastLine) ~= "table" then BC.db.lastLine = {} end
   BC.char = c
@@ -907,7 +911,7 @@ local function Help()
     "/boar where" .. GREY .. "  boars here, and where next" .. END,
     "/boar route" .. GREY .. "  your road to 60" .. END,
     "/boar route all" .. GREY .. "  every boar known" .. END,
-    "/boar list" .. GREY .. "  boar list; tick boars to see them on the map" .. END,
+    "/boar list" .. GREY .. "  boar list; pick which boars get dots on the map" .. END,
     GOLD .. "Boars" .. END,
     "/boar add <name>" .. GREY .. "  count it as a boar" .. END,
     "/boar remove <name>" .. GREY .. "  stop counting it" .. END,
